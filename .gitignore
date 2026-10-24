@@ -1,5 +1,5 @@
 # Environments (kept in *.nosync so iCloud Desktop sync never evicts them)
-.venv
+/.venv
 .venv.nosync/
 .env
 __pycache__/
@@ -7,10 +7,10 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 # Run artefacts and downloaded papers (arXiv licences) stay local
-runs
-runs.nosync/
-data/papers
-data/papers.nosync/
+/runs
+/runs.nosync/
+/data/papers
+/data/papers.nosync/
 # LaTeX build outputs
 report/**/*.aux
 report/**/*.log

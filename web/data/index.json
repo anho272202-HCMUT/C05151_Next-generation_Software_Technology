@@ -52,6 +52,45 @@
   "events": 125
  },
  {
+  "run_id": "eval-full-s1-codeact",
+  "paper": "codeact",
+  "mode": "full",
+  "title": "Executable Code Actions Elicit Better LLM Agents",
+  "seed": 1,
+  "accepted": 1,
+  "rounds": 3,
+  "latency_s": 194.22,
+  "llm_calls": 16,
+  "tokens": 40657,
+  "events": 153
+ },
+ {
+  "run_id": "eval-full-s1-metagpt",
+  "paper": "metagpt",
+  "mode": "full",
+  "title": "METAGPT: META PROGRAMMING FOR A",
+  "seed": 1,
+  "accepted": 2,
+  "rounds": 2,
+  "latency_s": 197.31,
+  "llm_calls": 13,
+  "tokens": 32595,
+  "events": 115
+ },
+ {
+  "run_id": "eval-full-s1-reflexion",
+  "paper": "reflexion",
+  "mode": "full",
+  "title": "Reflexion: Language Agents with",
+  "seed": 1,
+  "accepted": 1,
+  "rounds": 2,
+  "latency_s": 158.74,
+  "llm_calls": 13,
+  "tokens": 30969,
+  "events": 125
+ },
+ {
   "run_id": "swe-agent-s2-76fd3e",
   "paper": "swe-agent",
   "mode": "full",
