@@ -1,0 +1,13 @@
+{
+  "_doc": "Evaluation corpus: LLM coding-agent papers (arXiv). PDFs are not committed; run scripts/download_papers.sh.",
+  "papers": [
+    {"file": "swe-agent.pdf", "arxiv": "2405.15793", "title": "SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering"},
+    {"file": "autocoderover.pdf", "arxiv": "2404.05427", "title": "AutoCodeRover: Autonomous Program Improvement"},
+    {"file": "agentless.pdf", "arxiv": "2407.01489", "title": "Agentless: Demystifying LLM-based Software Engineering Agents"},
+    {"file": "metagpt.pdf", "arxiv": "2308.00352", "title": "MetaGPT: Meta Programming for a Multi-Agent Collaborative Framework"},
+    {"file": "chatdev.pdf", "arxiv": "2307.07924", "title": "ChatDev: Communicative Agents for Software Development"},
+    {"file": "reflexion.pdf", "arxiv": "2303.11366", "title": "Reflexion: Language Agents with Verbal Reinforcement Learning"},
+    {"file": "swe-bench.pdf", "arxiv": "2310.06770", "title": "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?"},
+    {"file": "codeact.pdf", "arxiv": "2402.01030", "title": "Executable Code Actions Elicit Better LLM Agents"}
+  ]
+}

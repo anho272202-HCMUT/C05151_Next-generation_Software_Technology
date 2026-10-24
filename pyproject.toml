@@ -1,0 +1,37 @@
+[project]
+name = "critic-agent"
+version = "0.2.0"
+description = "Critic-Agent: multi-agent, evidence-grounded critical reviewer for LLM coding-agent papers (CO5151, Group 1)"
+readme = "README.md"
+authors = [{ name = "Ho Bao An", email = "baoan.92.cvan@gmail.com" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "langgraph==1.2.17",
+    "mcp==2.3.0",
+    "pymupdf==2.0",
+    "rank-bm25==0.2.2",
+    "numpy==2.5.4",
+    "networkx==3.7",
+    "chromadb==1.5.9",
+    "openai==3.37.0",
+    "anthropic==2.3.0",
+    "httpx==0.28.1",
+    "pydantic==2.14.1",
+    "python-dotenv==1.2.4",
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+]
+
+[project.scripts]
+critic-agent = "critic_agent.cli:main"
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
