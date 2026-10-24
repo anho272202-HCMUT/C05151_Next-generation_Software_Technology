@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import operator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
 from langgraph.types import Send
@@ -21,6 +22,7 @@ from .memory import EvidenceWindow
 MAX_LLM_ATTEMPTS = 3
 MIN_WEAKNESS_WORDS = 8
 SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
+GRAPH_AXES = {"fairness", "generalizability", "data_reliability", "reproducibility"}
 
 
 class ReviewState(TypedDict, total=False):
@@ -30,6 +32,7 @@ class ReviewState(TypedDict, total=False):
     title: str
     num_pages: int
     first_pages: str
+    code_urls: list[str]
     flags: list[dict]
     card: dict
     plan: dict[str, dict]
@@ -92,7 +95,8 @@ async def ingest(state: ReviewState, ctx: RunContext) -> ReviewState:
     ctx.trace.emit("node_end", "ingest", paper_id=meta["paper_id"], title=meta["title"], pages=meta["num_pages"],
                    sentences=meta["num_sentences"], chunks=meta["num_chunks"], flags=len(flags))
     return {"paper_id": meta["paper_id"], "title": meta["title"], "num_pages": meta["num_pages"],
-            "first_pages": meta["first_pages"], "flags": flags, "user_focus": focus}
+            "first_pages": meta["first_pages"], "flags": flags, "user_focus": focus,
+            "code_urls": [meta["own_repo"]] if meta.get("own_repo") else []}
 
 
 async def summarize(state: ReviewState, ctx: RunContext) -> ReviewState:
@@ -102,7 +106,8 @@ async def summarize(state: ReviewState, ctx: RunContext) -> ReviewState:
     setup = "\n".join(s["text"] for h in hits for s in h["sentences"])
     card = await ctx.ask("summarizer", "summarizer",
                          prompts.summarizer_user(state["first_pages"][:4000], setup[:2500], ctx.settings.guardrail))
-    card.setdefault("title", state.get("title"))
+    if state.get("title") and state["title"] != "Untitled":  # metadata comes from the PDF, never from the LLM
+        card["title"] = state["title"]
     ctx.trace.emit("node_end", "summarizer", card=card)
     return {"card": card}
 
@@ -118,7 +123,9 @@ async def orchestrate(state: ReviewState, ctx: RunContext) -> ReviewState:
     plan = _enrich_plan(_normalise_plan(raw.get("plan")), state["card"])
     graph_facts = ""
     if ctx.settings.use_graph and raw.get("graph_lookup", True):
-        graph_facts = await _graph_facts(ctx, state["card"].get("title") or state.get("title", ""))
+        graph_facts = await _graph_facts(ctx, Path(state["paper_path"]).stem)
+        if not graph_facts:  # not in the corpus graph under its file name: try the title
+            graph_facts = await _graph_facts(ctx, state["card"].get("title") or state.get("title", ""))
     ctx.trace.emit("node_end", "orchestrator", plan=plan, graph_lookup=bool(graph_facts), lessons=len(lessons))
     return {"plan": plan, "graph_facts": graph_facts, "lessons": lessons, "round": 0, "pending": list(AXES),
             "best": {}, "feedback": {}}
@@ -132,7 +139,7 @@ def dispatch(state: ReviewState) -> list[Send]:
             "axis": axis, "round": state["round"], "paper_id": state["paper_id"], "card": state["card"],
             "queries": state["plan"][axis]["queries"], "graph_facts": state.get("graph_facts", ""),
             "lessons": state.get("lessons", []), "feedback": state.get("feedback", {}).get(axis, ""),
-            "previous": state.get("best", {}).get(axis)}))
+            "previous": state.get("best", {}).get(axis), "code_urls": state.get("code_urls", [])}))
     return out
 
 
@@ -154,7 +161,9 @@ async def critic(task: dict, ctx: RunContext) -> ReviewState:
         for chunk in hits:
             for s in chunk["sentences"]:
                 window.add(s["id"], s["text"])
-    graph = task["graph_facts"] if axis in {"fairness", "generalizability", "data_reliability"} else ""
+    graph = task["graph_facts"] if axis in GRAPH_AXES else ""
+    if axis == "reproducibility":
+        graph = "\n".join(x for x in (graph, await _artifact_facts(ctx, agent, task.get("code_urls", []))) if x)
     raw = await ctx.ask("critic", agent, prompts.critic_user(
         axis, task["card"], window.render(), graph, task["lessons"], task["feedback"], task.get("previous"),
         ctx.settings.guardrail))
@@ -276,9 +285,15 @@ async def _graph_facts(ctx: RunContext, title: str) -> str:
     except (ToolDenied, ToolError):
         return ""
     lines = []
+    profile = (res.get("info") or {}).get("ref_profile")
+    if profile:
+        lines.append(f"SOURCES OF THIS PAPER: {profile['total']} references, {profile['peer_reviewed']} peer-reviewed, "
+                     f"{profile['preprint']} preprints, {profile['web']} web/software links "
+                     f"(median year {profile['median_year']})")
     for n in res.get("neighbors", []):
         meta = ", ".join(str(x) for x in (n.get("venue"), n.get("year")) if x)
-        lines.append(f"{n['relation']} ({n['direction']}): {n['title']}" + (f" [{meta}]" if meta else "") +
+        tag = "" if n.get("verified", True) else " (unverified proposal)"
+        lines.append(f"{n['relation']}{tag} ({n['direction']}): {n['title']}" + (f" [{meta}]" if meta else "") +
                      (f" — {n['note']}" if n.get("note") else ""))
     return "\n".join(lines)
 
@@ -286,6 +301,22 @@ async def _graph_facts(ctx: RunContext, title: str) -> str:
 def clean_ids(raw: Any) -> list[str]:
     """Normalise model-written sentence ids ('[p7s3]', ' p7s3 ') and keep at most three."""
     return [str(i).strip("[] ") for i in (raw if isinstance(raw, list) else []) if isinstance(i, (str, int))][:3]
+
+
+async def _artifact_facts(ctx: RunContext, agent: str, urls: list[str]) -> str:
+    if not urls:
+        return "ARTIFACT CHECK: no GitHub repository of this paper is linked in the PDF."
+    try:
+        res = await ctx.gateway.call("critic", "artifact_check", {"url": urls[0]})
+    except (ToolDenied, ToolError) as exc:
+        ctx.trace.emit("tool_error", agent, error=str(exc)[:200])
+        return ""
+    if not res.get("exists"):
+        return f"ARTIFACT CHECK: {res['url']} does not exist (404)."
+    return (f"ARTIFACT CHECK of {res['url']}: environment files {res['environment_files'] or 'none'}; "
+            f"README mentions seeds: {res['readme_mentions_seed']}; mentions reproduction: "
+            f"{res['readme_mentions_reproduce']}; licence {res['license']}; last push {res['last_push']}; "
+            f"archived {res['archived']}.")
 
 
 def _clean_critique(raw: dict, axis: str, rnd: int, window: EvidenceWindow) -> dict:

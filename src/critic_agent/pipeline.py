@@ -19,6 +19,7 @@ from .config import AXES, Settings
 from .cost import CostTracker
 from .events import Listener, Trace
 from .gateway import Approver, AuditLog, ToolGateway, deny_all
+from .lessons import LessonStore
 from .llm import build_llm
 from .report import render_markdown
 
@@ -43,14 +44,8 @@ def build_graph(ctx: RunContext):
     return g.compile()
 
 
-def _lessons(settings: Settings):
-    if not settings.use_memory:
-        return None
-    try:
-        from .lessons import LessonStore
-    except ImportError:  # long-term memory module added in phase 2
-        return None
-    return LessonStore.from_settings(settings)
+def _lessons(settings: Settings) -> LessonStore | None:
+    return LessonStore.from_settings(settings) if settings.use_memory else None
 
 
 async def run_review(paper: str, settings: Settings, *, seed: int = 0, focus: str = "",

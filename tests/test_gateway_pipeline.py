@@ -76,3 +76,15 @@ async def test_full_review_end_to_end(mock_settings):
 async def test_baseline_single_call(mock_settings):
     final = await run_baseline("reflexion.pdf", mock_settings, seed=1, run_id="b")
     assert final["mode"] == "baseline" and final["cost"]["calls"] == 1
+
+
+async def test_artifact_check_uses_cache(mock_settings):
+    cache = mock_settings.cache_dir / "artifacts" / "nus-apr__auto-code-rover.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({"url": "https://github.com/nus-apr/auto-code-rover", "exists": True,
+                                 "environment_files": ["Dockerfile"], "readme_mentions_seed": False}))
+    async with ToolGateway(mock_settings, AuditLog(mock_settings.runs_dir / "a.jsonl"), Trace("t")) as gw:
+        res = await gw.call("critic", "artifact_check", {"url": "https://github.com/nus-apr/auto-code-rover"})
+        assert res["environment_files"] == ["Dockerfile"]
+        with pytest.raises(ToolDenied):
+            await gw.call("summarizer", "artifact_check", {"url": "https://github.com/x/y"})

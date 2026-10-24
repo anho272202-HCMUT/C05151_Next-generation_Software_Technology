@@ -1,0 +1,11 @@
+{
+  "_doc": "Edges added by the group after reading the papers (human-verified). LLM-proposed edges are kept separately with verified=false.",
+  "edges": [
+    {"source": "agentless", "target": "swe-agent", "type": "CONTRADICTS", "verified": true, "curator": "group",
+     "note": "Agentless questions whether complex autonomous agent scaffolds (tools, multi-turn decisions) are needed and reports a simple localize-repair-validate pipeline that is competitive at lower cost.",
+     "evidence_page": 1},
+    {"source": "agentless", "target": "autocoderover", "type": "CONTRADICTS", "verified": true, "curator": "group",
+     "note": "Same argument against agent-based program repair; Agentless also reports problems in SWE-bench Lite issues that affect all compared systems.",
+     "evidence_page": 1}
+  ]
+}

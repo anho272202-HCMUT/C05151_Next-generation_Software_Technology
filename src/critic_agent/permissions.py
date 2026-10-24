@@ -37,6 +37,8 @@ TOOL_POLICY: dict[str, ToolPolicy] = {
                                 "Return verbatim sentences by id (citation verification)"),
     "graph_query": ToolPolicy(Level.READ_ONLY, frozenset({"orchestrator", "critic"}), False,
                               "Neighbours of a paper in the paper graph (<= 20 nodes)"),
+    "artifact_check": ToolPolicy(Level.READ_ONLY, frozenset({"critic"}), False,
+                                 "Read public GitHub metadata of the paper's code repository (GET only, cached)"),
     "save_annotation": ToolPolicy(Level.REVERSIBLE_WRITE, frozenset({"user"}), False,
                                   "Append a note to the session file; undone by delete_annotation"),
     "delete_annotation": ToolPolicy(Level.REVERSIBLE_WRITE, frozenset({"user"}), False,

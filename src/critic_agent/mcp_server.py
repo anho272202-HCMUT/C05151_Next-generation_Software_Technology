@@ -9,14 +9,17 @@ cache directory (`runs/cache`) is written by `pdf_ingest`.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import re
 import shutil
 import subprocess
 import time
 import uuid
 from pathlib import Path
 
+import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp_types import ToolAnnotations
 
@@ -29,6 +32,10 @@ from .retrieval import HashEmbedder, OllamaEmbedder, PaperIndex, build_chunks
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+GITHUB_REPO = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
+NOT_CODE = {"features", "swe-bench", "about", "orgs", "topics", "marketplace"}
+REPRO_FILES = ("Dockerfile", "requirements.txt", "environment.yml", "pyproject.toml", "setup.py", "Makefile",
+               "docker-compose.yml")
 MAX_K = 8
 MAX_IDS = 12
 MAX_NOTE_CHARS = 1000
@@ -91,7 +98,31 @@ def pdf_ingest(path: str) -> str:
     first = [s.text for s in sentences if s.page <= 2][:60]
     return json.dumps({"paper_id": paper.paper_id, "title": paper.title, "num_pages": paper.num_pages,
                        "num_sentences": len(sentences), "num_chunks": len(chunks),
-                       "first_pages": " ".join(first)[:5000], "guardrail_flags": flags})
+                       "first_pages": " ".join(first)[:5000], "guardrail_flags": flags,
+                       "code_urls": (urls := _code_urls(pages, Path(path).stem)),
+                       "own_repo": _own_repo(urls, Path(path).stem)})
+
+
+def _own_repo(urls: list[str], stem: str) -> str | None:
+    """The paper's own repository: a linked repo whose owner/name contains the paper's file stem."""
+    key = re.sub(r"[^a-z0-9]", "", stem.lower())
+    return next((u for u in urls if key and key in re.sub(r"[^a-z0-9]", "", u.lower().split("github.com/")[1])), None)
+
+
+def _code_urls(pages: list[str], stem: str) -> list[str]:
+    """GitHub repositories mentioned in the paper; the paper's own repo (name matches the file stem) first,
+    then first-page mentions, then the rest."""
+    found: dict[str, tuple[int, int]] = {}
+    key = re.sub(r"[^a-z0-9]", "", stem.lower())
+    for page_no, text in enumerate(pages, start=1):
+        for owner, repo in GITHUB_REPO.findall(text.replace("\n", " ")):
+            repo = re.sub(r"\.(?=[A-Z0-9]).*$", "", repo).rstrip(".").removesuffix(".git")
+            if owner.lower() in NOT_CODE or not repo:
+                continue
+            url = f"https://github.com/{owner}/{repo}"
+            own = 0 if key and key in re.sub(r"[^a-z0-9]", "", f"{owner}{repo}".lower()) else 1
+            found.setdefault(url, (own, page_no))
+    return sorted(found, key=found.get)[:5]
 
 
 @server.tool(annotations=READ_ONLY)
@@ -115,7 +146,45 @@ def graph_query(paper: str, relation: str | None = None) -> str:
     """Neighbours of a paper in the paper graph (CITES, CONTRADICTS, USES_BENCHMARK, ...), capped at 20."""
     store = JsonGraphStore(settings.graph_path)
     node = store.resolve(paper)
-    return json.dumps({"node": node, "neighbors": store.neighbors(node, relation, MAX_NODES) if node else []})
+    if node is None:
+        return json.dumps({"node": None, "info": None, "neighbors": []})
+    return json.dumps({"node": node, "info": store.node_info(node),
+                       "neighbors": store.neighbors(node, relation, MAX_NODES)})
+
+
+@server.tool(annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True,
+                                         open_world_hint=True))
+def artifact_check(url: str) -> str:
+    """Reproducibility facts for a public GitHub repository (exists, activity, licence, environment files,
+    README mentions of seeds). GET requests only; results are cached so demos work offline."""
+    m = GITHUB_REPO.search(url)
+    if not m:
+        raise ValueError("Not a GitHub repository URL")
+    owner, repo = m.group(1), m.group(2).removesuffix(".git")
+    cache = settings.cache_dir / "artifacts" / f"{owner}__{repo}.json"
+    if cache.exists():
+        return cache.read_text()
+    api = f"https://api.github.com/repos/{owner}/{repo}"
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "critic-agent"}
+    with httpx.Client(timeout=20, headers=headers, follow_redirects=True) as client:
+        info = client.get(api)
+        if info.status_code == 404:
+            result = {"url": url, "exists": False}
+        else:
+            info.raise_for_status()
+            meta = info.json()
+            names = {f["name"] for f in client.get(f"{api}/contents").json() if isinstance(f, dict)}
+            readme = client.get(f"{api}/readme")
+            text = base64.b64decode(readme.json().get("content", "")).decode("utf-8", "ignore") if readme.is_success else ""
+            result = {"url": url, "exists": True, "stars": meta.get("stargazers_count"),
+                      "archived": meta.get("archived"), "last_push": meta.get("pushed_at"),
+                      "license": (meta.get("license") or {}).get("spdx_id"),
+                      "environment_files": [f for f in REPRO_FILES if f in names],
+                      "readme_mentions_seed": bool(re.search(r"\bseeds?\b", text, re.IGNORECASE)),
+                      "readme_mentions_reproduce": bool(re.search(r"reproduc", text, re.IGNORECASE))}
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps(result))
+    return json.dumps(result)
 
 
 # ------------------------------------------------------------------ reversible writes

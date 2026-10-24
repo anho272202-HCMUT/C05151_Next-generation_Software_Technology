@@ -35,6 +35,7 @@ On a Desktop folder synced by iCloud, keep the virtualenv, papers and run artefa
 ## Usage
 
 ```bash
+uv run python -m critic_agent.graph_builder                       # build the paper graph once (runs/graph/)
 uv run critic-agent review swe-agent.pdf --seed 1                 # full multi-agent review -> runs/<run_id>/
 uv run critic-agent review autocoderover.pdf --focus "focus on fairness"
 uv run critic-agent baseline swe-agent.pdf --seed 1               # simpler config: one LLM call, no tools/loop

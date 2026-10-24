@@ -13,6 +13,7 @@ from typing import Protocol
 import networkx as nx
 
 MAX_NODES = 20
+RELATION_PRIORITY = {"CONTRADICTS": 0, "COMPARES_WITH": 1, "CITES": 2, "USES_BENCHMARK": 3}
 
 
 class GraphStore(Protocol):
@@ -38,6 +39,11 @@ class JsonGraphStore:
                 return node
         return None
 
+    def node_info(self, node_id: str) -> dict:
+        d = self.graph.nodes[node_id]
+        return {"id": node_id, "title": d.get("title"), "venue": d.get("venue"), "year": d.get("year"),
+                "ref_profile": d.get("ref_profile")}
+
     def neighbors(self, node_id: str, relation: str | None = None, limit: int = MAX_NODES) -> list[dict]:
         out = []
         edges = [(u, v, d, "out") for u, v, d in self.graph.out_edges(node_id, data=True)]
@@ -49,7 +55,7 @@ class JsonGraphStore:
             node = self.graph.nodes[other]
             out.append({"relation": d.get("type"), "direction": direction, "node": other,
                         "title": node.get("title", other), "venue": node.get("venue"), "year": node.get("year"),
-                        "note": d.get("note", "")})
-            if len(out) >= min(limit, MAX_NODES):
-                break
-        return out
+                        "note": d.get("note", ""), "verified": d.get("verified", True)})
+        # Most informative relations first, so the 20-node cap never hides a contradiction.
+        out.sort(key=lambda n: RELATION_PRIORITY.get(n["relation"], 9))
+        return out[: min(limit, MAX_NODES)]
