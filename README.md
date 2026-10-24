@@ -9,7 +9,7 @@ reproducibility. Every critique cites a sentence that the system verifies agains
 **Live demo (GitHub Pages):** https://anho272202-hcmut.github.io/C05151_Next-generation_Software_Technology/ —
 the Critic-Agent Explorer replays real recorded runs step by step (architecture highlighting, tool calls with permission
 levels, critiques, evaluator verdicts, targeted reflection), plus the knowledge graph, evaluation results and a
-guardrail playground. Run it locally with live reviews: `uv run critic-agent serve` → http://localhost:8000.
+guardrail playground. Run it locally with live reviews: `uv run critic-agent serve` → http://localhost:8000 (Vietnamese guide: `docs/LOCAL_DEMO.md`).
 
 ## Repository layout
 
