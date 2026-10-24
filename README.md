@@ -6,6 +6,11 @@ reproducibility. Every critique cites a sentence that the system verifies agains
 
 > Status: D2 (interim) in progress. See `docs/` for the architecture and `report/D2/` for the progress report.
 
+**Live demo (GitHub Pages):** https://anho272202-hcmut.github.io/C05151_Next-generation_Software_Technology/ —
+the Critic-Agent Explorer replays real recorded runs step by step (architecture highlighting, tool calls with permission
+levels, critiques, evaluator verdicts, targeted reflection), plus the knowledge graph, evaluation results and a
+guardrail playground. Run it locally with live reviews: `uv run critic-agent serve` → http://localhost:8000.
+
 ## Repository layout
 
 | Path | Content |
@@ -40,6 +45,8 @@ uv run critic-agent review swe-agent.pdf --seed 1                 # full multi-a
 uv run critic-agent review autocoderover.pdf --focus "focus on fairness"
 uv run critic-agent baseline swe-agent.pdf --seed 1               # simpler config: one LLM call, no tools/loop
 uv run pytest -q                                                  # offline tests (mock LLM)
+uv run critic-agent serve                                         # web Explorer + live runs on http://localhost:8000
+uv run python scripts/export_web_data.py                          # refresh web/data from runs/ and results/
 ```
 
 Each run writes `output.json`, `report.md`, `trace.jsonl` (event log replayed by the web Explorer),

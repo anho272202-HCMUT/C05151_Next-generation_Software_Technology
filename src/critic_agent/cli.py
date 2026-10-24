@@ -41,11 +41,19 @@ def main(argv: list[str] | None = None) -> None:
         p = sub.add_parser(name)
         p.add_argument("paper", help="PDF inside data/papers/")
         p.add_argument("--seed", type=int, default=0)
+    serve = sub.add_parser("serve", help="web Explorer with live runs on http://localhost:8000")
+    serve.add_argument("--port", type=int, default=8000)
     review = sub.choices["review"]
     review.add_argument("--focus", default="", help="optional user request, e.g. 'focus on fairness'")
     review.add_argument("--no-reflection", action="store_true")
     review.add_argument("--no-guardrail", action="store_true")
     args = parser.parse_args(argv)
+    if args.command == "serve":
+        from .server import serve as run_server
+
+        print(f"Critic-Agent Explorer on http://localhost:{args.port}")
+        run_server(port=args.port)
+        return
     settings = load_settings()
     if args.command == "baseline":
         final = asyncio.run(run_baseline(args.paper, settings, seed=args.seed))

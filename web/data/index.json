@@ -1,0 +1,67 @@
+[
+ {
+  "run_id": "eval-full-s1-agentless",
+  "paper": "agentless",
+  "mode": "full",
+  "title": "Demystifying LLM-based Software Engineering Agents",
+  "seed": 1,
+  "accepted": 2,
+  "rounds": 3,
+  "latency_s": 184.01,
+  "llm_calls": 16,
+  "tokens": 37667,
+  "events": 146
+ },
+ {
+  "run_id": "baseline-autocoderover-s1-817004",
+  "paper": "autocoderover",
+  "mode": "baseline",
+  "title": "AutoCodeRover: Autonomous Program Improvement",
+  "seed": 1,
+  "accepted": null,
+  "rounds": null,
+  "latency_s": 29.06,
+  "llm_calls": 1,
+  "tokens": 2013,
+  "events": 10
+ },
+ {
+  "run_id": "eval-full-s1-autocoderover",
+  "paper": "autocoderover",
+  "mode": "full",
+  "title": "AutoCodeRover: Autonomous Program Improvement",
+  "seed": 1,
+  "accepted": 3,
+  "rounds": 2,
+  "latency_s": 108.96,
+  "llm_calls": 12,
+  "tokens": 27495,
+  "events": 109
+ },
+ {
+  "run_id": "eval-full-s1-chatdev",
+  "paper": "chatdev",
+  "mode": "full",
+  "title": "ChatDev: Communicative Agents for Software Development",
+  "seed": 1,
+  "accepted": 1,
+  "rounds": 2,
+  "latency_s": 175.4,
+  "llm_calls": 13,
+  "tokens": 31476,
+  "events": 125
+ },
+ {
+  "run_id": "swe-agent-s2-76fd3e",
+  "paper": "swe-agent",
+  "mode": "full",
+  "title": "SWE-agent: Agent-Computer Interfaces for Enhancing Language Model Agents in Software Engineering",
+  "seed": 2,
+  "accepted": 1,
+  "rounds": 2,
+  "latency_s": 179.22,
+  "llm_calls": 13,
+  "tokens": 31490,
+  "events": 123
+ }
+]

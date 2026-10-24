@@ -1,0 +1,126 @@
+{
+ "axes": [
+  {
+   "id": "assumptions",
+   "guide": "hidden assumptions about the execution environment or inputs (perfect sandbox, pre-installed dependencies, available test suites, clean issue descriptions)"
+  },
+  {
+   "id": "fairness",
+   "guide": "fairness of the comparison with baselines (same LLM, same token/cost budget, same number of attempts, numbers copied from other papers instead of re-run)"
+  },
+  {
+   "id": "data_reliability",
+   "guide": "reliability of the benchmark data (contamination / leakage into LLM training data, small or self-constructed datasets, noisy or filtered subsets, LLM-as-judge metrics)"
+  },
+  {
+   "id": "generalizability",
+   "guide": "whether results transfer beyond the evaluated setting (only Python, few repositories, toy tasks instead of real codebases, single benchmark)"
+  },
+  {
+   "id": "reproducibility",
+   "guide": "whether results can be reproduced (closed models that change, seeds, number of runs, variance, released code/configs, cost to reproduce)"
+  }
+ ],
+ "tools": [
+  {
+   "name": "pdf_ingest",
+   "level": "read-only",
+   "agents": [
+    "ingest"
+   ],
+   "needs_approval": false,
+   "description": "Parse + sanitise + index a PDF from data/papers/ (only the server's cache is written)"
+  },
+  {
+   "name": "search_paper",
+   "level": "read-only",
+   "agents": [
+    "critic",
+    "orchestrator",
+    "summarizer"
+   ],
+   "needs_approval": false,
+   "description": "Hybrid search over one indexed paper, returns numbered sentences"
+  },
+  {
+   "name": "get_sentences",
+   "level": "read-only",
+   "agents": [
+    "critic",
+    "evaluator",
+    "synthesizer"
+   ],
+   "needs_approval": false,
+   "description": "Return verbatim sentences by id (citation verification)"
+  },
+  {
+   "name": "graph_query",
+   "level": "read-only",
+   "agents": [
+    "critic",
+    "orchestrator"
+   ],
+   "needs_approval": false,
+   "description": "Neighbours of a paper in the paper graph (<= 20 nodes)"
+  },
+  {
+   "name": "artifact_check",
+   "level": "read-only",
+   "agents": [
+    "critic"
+   ],
+   "needs_approval": false,
+   "description": "Read public GitHub metadata of the paper's code repository (GET only, cached)"
+  },
+  {
+   "name": "save_annotation",
+   "level": "reversible-write",
+   "agents": [
+    "user"
+   ],
+   "needs_approval": false,
+   "description": "Append a note to the session file; undone by delete_annotation"
+  },
+  {
+   "name": "delete_annotation",
+   "level": "reversible-write",
+   "agents": [
+    "user"
+   ],
+   "needs_approval": false,
+   "description": "Remove a note by id (undo of save_annotation)"
+  },
+  {
+   "name": "publish_review",
+   "level": "irreversible-write",
+   "agents": [
+    "user"
+   ],
+   "needs_approval": true,
+   "description": "Write the review to the append-only published/ log (no overwrite, no delete)"
+  },
+  {
+   "name": "execute_code_in_sandbox",
+   "level": "code-execution",
+   "agents": [
+    "critic"
+   ],
+   "needs_approval": true,
+   "description": "Run Python in Docker (no network, 1 GB, 30 s); disabled by default"
+  }
+ ],
+ "injection_patterns": [
+  "\\b(ignore|disregard|forget|override)\\b[^.\\n]{0,40}\\b(previous|prior|above|earlier|all|your)\\b[^.\\n]{0,20}\\b(instruction|prompt|rule|guideline|task)s?",
+  "\\byou are now\\b|\\b(follow|here are) (the |these )?new instructions\\b|\\b(developer|admin|god|jailbreak) mode\\b",
+  "\\b(reveal|print|show|repeat|output)\\b[^.\\n]{0,30}\\b(system prompt|hidden prompt|instructions above)\\b",
+  "\\b(dear|attention|note to( the)?|hey)\\s+(ai|llm|language model|assistant|automated reviewer|ai reviewer|reviewer model)\\b",
+  "\\bto (any|all) (ai|llm|automated) (reviewer|assistant|system|agent)s?\\b",
+  "\\b(do not|don't|never)\\s+(report|mention|flag|criticize|critique|list|output)\\b[^.\\n]{0,40}\\b(weakness|limitation|flaw|contamination)",
+  "\\b(rate|score|grade)\\b[^.\\n]{0,20}\\b(this paper|the paper|it)\\b[^.\\n]{0,20}\\b(10|perfect|flawless|maximum)",
+  "\\b(this paper|the paper)\\s+(is|has)\\s+(flawless|perfect|no (weaknesses|limitations|flaws))\\b",
+  "\\b(execute_code_in_sandbox|save_annotation|delete_annotation|publish_review|search_paper|pdf_ingest)\\b",
+  "\\b(respond|reply|answer)\\s+only\\s+with\\b|\\boutput\\s+exactly\\b",
+  "\\bsystem\\s*:\\s|\\[\\s*system\\s*\\]|<\\s*/?\\s*system\\s*>"
+ ],
+ "model": "qwen2.5:3b"
+}
