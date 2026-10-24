@@ -32,6 +32,25 @@ ollama pull qwen2.5:3b && ollama pull nomic-embed-text
 On a Desktop folder synced by iCloud, keep the virtualenv, papers and run artefacts in `*.nosync` folders
 (`.venv -> .venv.nosync`, `data/papers -> data/papers.nosync`, `runs -> runs.nosync`) so iCloud never evicts them mid-run.
 
+## Usage
+
+```bash
+uv run critic-agent review swe-agent.pdf --seed 1                 # full multi-agent review -> runs/<run_id>/
+uv run critic-agent review autocoderover.pdf --focus "focus on fairness"
+uv run critic-agent baseline swe-agent.pdf --seed 1               # simpler config: one LLM call, no tools/loop
+uv run pytest -q                                                  # offline tests (mock LLM)
+```
+
+Each run writes `output.json`, `report.md`, `trace.jsonl` (event log replayed by the web Explorer),
+`audit.jsonl` (every tool request incl. denials) and `cost.json` (tokens, latency, USD, gpt-4o-mini-equivalent USD).
+
+## Architecture (D2)
+
+`ingest → Summarizer → Orchestrator → 5 axis Critics (parallel, LangGraph Send) → Evaluator → targeted reflection
+(rejected axes only, ≤2 rounds, stop when no improvement) → Synthesizer`. Critics cite sentence ids; the system copies the
+verbatim sentence, and the Evaluator checks ids deterministically before an LLM judge scores axis-fit and support.
+All tools go through `ToolGateway` → MCP server. See `docs/architecture.md`.
+
 ## Team
 
 | Member | Student ID | Role |
