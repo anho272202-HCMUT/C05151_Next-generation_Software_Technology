@@ -1,0 +1,95 @@
+{
+  "_doc": "Ground truth for the D2 task set. A task is one (paper, axis) pair: 8 papers x 5 axes = 40 tasks. Each task lists the known weaknesses (1-2) written by the group from the PDF, with the page where the issue is visible or admitted. A critique solves a task when it is grounded (cited sentences verified) AND it matches one of the listed weaknesses. Matching is done by an LLM judge whose agreement with human labels is measured on a sample (eval/human_labels.csv); keywords are kept as a deterministic fallback matcher.",
+  "version": "2026-10-24",
+  "tasks": [
+    {"paper": "agentless.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "agentless-ass-1", "page": 3, "description": "Assumes the LLM can generate reproduction tests that reproduce the issue and that the repository's existing regression tests are runnable; patch selection depends on both.", "keywords": ["reproduction test", "regression test", "test suite", "runnable", "generated test"]}]},
+    {"paper": "agentless.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "agentless-fair-1", "page": 10, "description": "Compared tools use different LLMs and scaffolds, and many numbers come from the SWE-bench leaderboard or reports rather than being re-run under a matched model and budget.", "keywords": ["different llm", "different model", "leaderboard", "reported", "same model", "same budget", "matched"]}]},
+    {"paper": "agentless.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "agentless-data-1", "page": 18, "description": "Ground-truth SWE-bench Lite patches may be in GPT-4o's training data (data leakage), acknowledged as a threat to validity.", "keywords": ["contamina", "leak", "training data", "memoriz", "pre-train"]},
+      {"id": "agentless-data-2", "page": 15, "description": "SWE-bench Lite still contains problematic issues (underspecified, solution given in the issue); results depend on the filtered subset.", "keywords": ["problematic", "underspecified", "lite-s", "filtered", "solution in the issue", "noisy"]}]},
+    {"paper": "agentless.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "agentless-gen-1", "page": 9, "description": "Evaluated only on Python repositories of SWE-bench Lite (300 issues); other languages and private codebases untested.", "keywords": ["python", "other language", "300", "single benchmark", "only swe-bench"]}]},
+    {"paper": "agentless.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "agentless-rep-1", "page": 18, "description": "Relies on closed-source GPT-4o and on sampling many candidate patches; results depend on model version and sampling randomness, with no variance reported.", "keywords": ["closed-source", "closed source", "proprietary", "model version", "randomness", "sampling", "variance"]}]},
+
+    {"paper": "autocoderover.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "acr-ass-1", "page": 7, "description": "Spectrum-based fault localisation assumes an executable environment with a test suite that exposes the bug; the method degrades when tests are missing.", "keywords": ["test suite", "sbfl", "spectrum", "fault localization", "available tests", "executable environment"]}]},
+    {"paper": "autocoderover.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "acr-fair-1", "page": 7, "description": "Devin's result is taken from its technical report on a different subset instead of being re-run under the same setting and budget.", "keywords": ["devin", "technical report", "different subset", "not re-run", "same setting"]}]},
+    {"paper": "autocoderover.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "acr-data-1", "page": 7, "description": "Possible contamination of SWE-bench issues and patches in GPT-4's training data is not analysed; SWE-bench Lite has only 300 issues.", "keywords": ["contamina", "leak", "training data", "memoriz", "300", "small"]}]},
+    {"paper": "autocoderover.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "acr-gen-1", "page": 7, "description": "Only Python projects from SWE-bench (Lite); transfer to other languages or industrial codebases is untested.", "keywords": ["python", "other language", "repositories", "industrial", "other benchmark"]}]},
+    {"paper": "autocoderover.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "acr-rep-1", "page": 11, "description": "Only three repetitions with a closed GPT-4 model; randomness is acknowledged and results may drift with model versions.", "keywords": ["three times", "three runs", "randomness", "variance", "closed", "model version"]}]},
+
+    {"paper": "chatdev.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "chatdev-ass-1", "page": 9, "description": "Assumes clear, detailed software requirements; the authors note agents struggle when requirements are vague.", "keywords": ["requirement", "specification", "vague", "detailed"]}]},
+    {"paper": "chatdev.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "chatdev-fair-1", "page": 7, "description": "The multi-agent setup consumes far more tokens and time than single-agent baselines, so the comparison is not budget-matched.", "keywords": ["more tokens", "token", "budget", "consum", "slower", "cost"]}]},
+    {"paper": "chatdev.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "chatdev-data-1", "page": 7, "description": "Quality is judged largely by GPT-4 pairwise win rates (LLM-as-judge bias) on a self-built task set.", "keywords": ["win rate", "llm-as-judge", "judge", "gpt-4 evaluat", "self-built", "srdd"]}]},
+    {"paper": "chatdev.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "chatdev-gen-1", "page": 9, "description": "Generated software implements simple logic with low information density; capabilities may be overestimated for real-world software.", "keywords": ["simple logic", "information density", "overestimat", "toy", "simple software", "real-world"]}]},
+    {"paper": "chatdev.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "chatdev-rep-1", "page": 6, "description": "Depends on the closed ChatGPT-3.5 API with sampling (temperature 0.2); no variance across runs is reported.", "keywords": ["variance", "seed", "randomness", "closed", "temperature", "model version", "chatgpt"]}]},
+
+    {"paper": "codeact.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "codeact-ass-1", "page": 9, "description": "Assumes a safe, pre-provisioned Python interpreter with the needed packages; the agent may hallucinate variable contents instead of inspecting them.", "keywords": ["hallucinat", "interpreter", "package", "safe", "sandbox", "execution environment"]}]},
+    {"paper": "codeact.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "codeact-fair-1", "page": 4, "description": "JSON and text action baselines use prompts written by the authors; prompt design may favour code actions.", "keywords": ["json", "text action", "prompt", "action format", "same prompt"]}]},
+    {"paper": "codeact.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "codeact-data-1", "page": 4, "description": "M3ToolEval is a newly curated benchmark of only 82 instances built by the same authors.", "keywords": ["m3tooleval", "82", "curated", "small", "self-construct", "newly"]}]},
+    {"paper": "codeact.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "codeact-gen-1", "page": 3, "description": "Actions are Python-only; results may not transfer to other languages, tools or environments.", "keywords": ["python", "other language", "tool", "environment"]}]},
+    {"paper": "codeact.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "codeact-rep-1", "page": 5, "description": "Many of the 17 compared LLMs are closed-source APIs whose versions change; no variance across runs is reported.", "keywords": ["closed", "model version", "variance", "seed", "api"]}]},
+
+    {"paper": "metagpt.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "metagpt-ass-1", "page": 4, "description": "Assumes well-defined standard operating procedures and role specialisation transfer from human teams; relies on executable feedback that needs a runnable environment.", "keywords": ["sop", "standard operating", "role", "executable feedback", "environment"]}]},
+    {"paper": "metagpt.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "metagpt-fair-1", "page": 8, "description": "Comparison with ChatDev and others relies on metrics such as human revision cost and executability scores, possibly under different models and settings.", "keywords": ["chatdev", "human revision", "different model", "gpt-3.5", "same setting", "same model"]}]},
+    {"paper": "metagpt.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "metagpt-data-1", "page": 7, "description": "SoftwareDev is a self-constructed set of only 70 tasks, and executability is rated by humans on a 1-4 scale.", "keywords": ["softwaredev", "70", "self-constructed", "human evaluat", "executability", "small"]},
+      {"id": "metagpt-data-2", "page": 7, "description": "HumanEval and MBPP are likely in GPT-4's training data (contamination).", "keywords": ["contamina", "leak", "training data", "memoriz", "humaneval"]}]},
+    {"paper": "metagpt.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "metagpt-gen-1", "page": 7, "description": "Tasks are small programs (mini-games, utilities), not large real-world codebases.", "keywords": ["toy", "mini-game", "small", "large codebase", "real-world", "simple"]}]},
+    {"paper": "metagpt.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "metagpt-rep-1", "page": 8, "description": "Depends on closed GPT-4 APIs; no seeds or variance are reported for the main results.", "keywords": ["closed", "seed", "variance", "randomness", "model version"]}]},
+
+    {"paper": "reflexion.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "reflexion-ass-1", "page": 7, "description": "Relies on self-generated internal unit tests; false-positive or false-negative tests directly mislead the reflection loop.", "keywords": ["internal test", "unit test", "false positive", "self-generated", "generated test"]}]},
+    {"paper": "reflexion.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "reflexion-fair-1", "page": 7, "description": "Reflexion uses multiple trials with feedback while baselines get a single attempt, which inflates pass@1 comparisons.", "keywords": ["multiple trial", "attempt", "trials", "same number", "pass@1"]}]},
+    {"paper": "reflexion.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "reflexion-data-1", "page": 7, "description": "HumanEval and MBPP may be contaminated in GPT-4 training data; benchmarks are small.", "keywords": ["contamina", "leak", "training data", "memoriz", "small benchmark"]}]},
+    {"paper": "reflexion.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "reflexion-gen-1", "page": 9, "description": "May get stuck in local minima; long-term memory is limited to a small sliding window, so gains on harder or longer tasks are unclear.", "keywords": ["local minim", "sliding window", "memory", "harder", "complex"]}]},
+    {"paper": "reflexion.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "reflexion-rep-1", "page": 7, "description": "Uses closed GPT-4 APIs; no seeds or variance over runs are reported.", "keywords": ["closed", "seed", "variance", "randomness", "model version"]}]},
+
+    {"paper": "swe-agent.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "sweagent-ass-1", "page": 21, "description": "Assumes a pre-built Docker environment per repository with dependencies installed; real projects often fail to install.", "keywords": ["docker", "pre-installed", "dependenc", "environment", "installation", "container"]}]},
+    {"paper": "swe-agent.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "sweagent-fair-1", "page": 5, "description": "The agent-computer interface was tuned on hand-picked development examples, and RAG baselines do not get an equivalent interactive budget.", "keywords": ["rag", "retrieval baseline", "budget", "hand-picked", "development", "tuned", "configuration"]}]},
+    {"paper": "swe-agent.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "sweagent-data-1", "page": 9, "description": "SWE-bench issues pre-date model training cut-offs; contamination is not ruled out.", "keywords": ["contamina", "leak", "training data", "memoriz", "cutoff", "cut-off"]}]},
+    {"paper": "swe-agent.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "sweagent-gen-1", "page": 4, "description": "Main evaluation uses Python-only repositories; HumanEvalFix is small and function-level.", "keywords": ["python", "other language", "repositories", "function-level", "humanevalfix"]}]},
+    {"paper": "swe-agent.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "sweagent-rep-1", "page": 5, "description": "A $4 per-instance cost cap and expensive closed models make full reproduction costly; results come from few runs.", "keywords": ["$4", "budget", "expensive", "cost", "closed", "single run"]}]},
+
+    {"paper": "swe-bench.pdf", "axis": "assumptions", "weaknesses": [
+      {"id": "swebench-ass-1", "page": 4, "description": "Correctness is judged only by fail-to-pass and pass-to-pass tests, which may be insufficient; assumes reproducible execution environments.", "keywords": ["fail-to-pass", "test", "insufficient", "coverage", "execution environment"]}]},
+    {"paper": "swe-bench.pdf", "axis": "fairness", "weaknesses": [
+      {"id": "swebench-fair-1", "page": 6, "description": "Baselines differ in context length and retrieval (BM25 vs oracle), which confounds the comparison of models.", "keywords": ["oracle", "bm25", "context window", "context length", "retrieval"]}]},
+    {"paper": "swe-bench.pdf", "axis": "data_reliability", "weaknesses": [
+      {"id": "swebench-data-1", "page": 4, "description": "Issues may pre-date model training cut-offs (contamination); only SWE-Llama's training repositories are made disjoint.", "keywords": ["contamina", "leak", "cutoff", "cut-off", "memoriz", "training data"]}]},
+    {"paper": "swe-bench.pdf", "axis": "generalizability", "weaknesses": [
+      {"id": "swebench-gen-1", "page": 10, "description": "All task instances are Python from 12 repositories.", "keywords": ["python", "other language", "12 repositories", "12 popular"]}]},
+    {"paper": "swe-bench.pdf", "axis": "reproducibility", "weaknesses": [
+      {"id": "swebench-rep-1", "page": 7, "description": "GPT-4 is evaluated on a 25% random subset because of budget; closed models make results hard to reproduce exactly.", "keywords": ["25%", "random subset", "subset", "closed", "budget", "cost"]}]}
+  ]
+}
