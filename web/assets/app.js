@@ -124,7 +124,7 @@
       case "llm_error": return `<b>${esc(ag)}</b>: lời gọi LLM lỗi (${esc(e.error)}). Hệ thống tự thử lại với seed khác.`;
       case "tool_call": return `<b>${esc(ag)}</b> gọi MCP tool <code>${esc(e.tool)}</code> <span class="lvl lvl-${e.level}">${LEVEL_VI[e.level] || e.level}</span> → gateway: <b>${esc(e.decision)}</b> (${e.latency_s}s).`;
       case "tool_denied": return `<b>Gateway CHẶN</b> <code>${esc(e.tool)}</code> mà ${esc(ag)} yêu cầu: ${e.reason === "least-privilege" ? "agent này không có quyền" : "không có người duyệt"}.`;
-      case "guardrail_flag": return `<b>Guardrail</b> đã vô hiệu hoá nội dung nghi là chỉ thị (nguồn: ${esc(e.source)}, trang ${e.page ?? "-"}): “${esc(e.snippet)}”`;
+      case "guardrail_flag": return `<b>Guardrail</b> đã vô hiệu hoá nội dung nghi là chỉ thị (nguồn: ${esc(e.source)}, trang ${e.page ?? "-"}${e.rule ? ", quy tắc " + esc(e.rule) : ""}): “${esc(e.snippet)}”`;
       case "critique": return e.no_issue ? `Critic ${esc(Arch.AXIS_LABEL[e.axis])}: không tìm thấy vấn đề.` :
         `Critic <b>${esc(Arch.AXIS_LABEL[e.axis])}</b> đề xuất: “${esc(e.weakness)}” · trích dẫn <code>${(e.evidence_ids || []).join(", ") || "—"}</code>` +
         (e.fabricated_ids?.length ? ` · <span class="bad">ID không có trong bằng chứng: ${e.fabricated_ids.join(", ")}</span>` : "");
@@ -416,22 +416,68 @@
     $("#tools-table").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Mức quyền</th><th>Agent được gọi</th><th>Người duyệt</th><th>Mô tả / cơ chế chặn</th></tr></thead><tbody>
       ${tools.map(t => `<tr><td><code>${t.name}</code></td><td><span class="lvl lvl-${t.level}">${LEVEL_VI[t.level]}</span></td><td>${t.agents.join(", ")}</td>
       <td>${t.needs_approval ? "bắt buộc + HMAC" : "—"}</td><td>${esc(t.description)}</td></tr>`).join("")}</tbody></table></div>`;
-    const patterns = (data.system?.injection_patterns || []).map(p => { try { return new RegExp(p, "i"); } catch { return null; } }).filter(Boolean);
-    const run = () => {
-      const text = $("#guard-input").value;
-      const parts = text.split(/(?<=[.!?])\s+|\n/);
-      $("#guard-output").innerHTML = parts.map(s => patterns.some(p => p.test(s)) ?
-        `<span class="redacted" title="${esc(s)}">[REDACTED: suspected injected instruction]</span>` : esc(s)).join(" ") +
-        `<p class="muted small">${parts.filter(s => patterns.some(p => p.test(s))).length} câu bị che · ${patterns.length} mẫu đang áp dụng</p>`;
+    renderInjection();
+  }
+
+  const TECH_VI = {direct_override: "Ghi đè chỉ thị", paraphrased_override: "Ghi đè diễn đạt lại", role_hijack: "Chiếm vai trò", fake_template: "Giả template/thẻ",
+    review_manipulation: "Thao túng bản phản biện", prompt_leak: "Lộ system prompt", tool_abuse: "Lạm dụng tool", exfiltration: "Rò rỉ dữ liệu",
+    obfuscation: "Che giấu (homoglyph, mã hoá…)", multilingual: "Đa ngôn ngữ", format_evasion: "Lách định dạng", authority: "Mạo danh thẩm quyền",
+    memory_poisoning: "Đầu độc bộ nhớ", hidden_pdf_text: "Chữ ẩn trong PDF", semantic_persuasion: "Thuyết phục ngữ nghĩa (rủi ro còn lại)"};
+  const pct = r => Math.round(r * 100) + "%";
+
+  function renderInjection() {
+    const d = data.injection;
+    if (!d) { $("#inj-cards").innerHTML = `<div class="panel muted">Chưa có kết quả: chạy <code>uv run python -m critic_agent.injection_eval --export-web</code>.</div>`; return; }
+    const S = d.summary, full = S.full, before = d.before?.summary;
+    const card = (title, big, sub) => `<div class="card"><div class="muted small">${title}</div><div class="big">${big}</div><div class="muted small">${sub}</div></div>`;
+    $("#inj-cards").innerHTML = [
+      card("Vô hiệu hoá (toàn bộ)", `${full.all.neutralised}/${full.all.total}`, before ? `trước: ${before.all.neutralised}/${before.all.total} (${pct(before.all.rate)}) → sau: ${pct(full.all.rate)}` : pct(full.all.rate)),
+      card("Tập heldout", `${full["split:heldout"].neutralised}/${full["split:heldout"].total}`, before ? `trước: ${before["split:heldout"].neutralised}/${before["split:heldout"].total}` : "viết trước khi chỉnh phòng thủ"),
+      card("Dương tính giả (câu lành tính)", `${d.benign.flagged}/${d.benign.total}`, before ? `trước: ${d.before.benign.flagged}/${d.before.benign.total}` : ""),
+      card("Dương tính giả trên corpus", d.corpus ? `${d.corpus.flags}/${d.corpus.sentences}` : "—", d.corpus ? "chỉ là template chat in trong phụ lục CodeAct" : "chưa tải corpus"),
+    ].join("");
+    const techs = [...new Set(d.attacks.map(a => a.technique))];
+    const cell = x => `<td class="num ${x.rate === 1 ? "good" : x.rate === 0 ? "bad" : ""}">${x.neutralised}/${x.total}</td>`;
+    const row = (label, key, resid) => `<tr${resid ? ' class="muted"' : ""}><td>${label}</td>${["none", "parser", "sanitizer", "full"].map(l => cell(S[l][key])).join("")}${
+      before ? `<td class="num">${before[key] ? before[key].neutralised + "/" + before[key].total : "—"}</td>` : ""}</tr>`;
+    $("#inj-table").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Kỹ thuật</th><th>Không phòng thủ</th><th>Chỉ L1 parser</th><th>Chỉ L2 sanitizer</th><th>L1 + L2 (hệ thống)</th>${before ? "<th>Guardrail cũ (D2)</th>" : ""}</tr></thead><tbody>
+      ${techs.map(t => row(TECH_VI[t] || t, t, t === "semantic_persuasion")).join("")}
+      ${row("<b>Tổng</b>", "all")}</tbody></table></div>`;
+    setupPlayground(d);
+  }
+
+  function setupPlayground(d) {
+    const sel = $("#guard-sample"), input = $("#guard-input");
+    const samples = d.attacks.filter(a => a.channel === "text");
+    sel.innerHTML = `<option value="">— tự nhập —</option>` + samples.map(a => `<option value="${a.id}">${a.id} · ${esc(TECH_VI[a.technique] || a.technique)}</option>`).join("");
+    const byId = Object.fromEntries(d.attacks.map(a => [a.id, a]));
+    const show = (clean, flags, note) => {
+      const html = esc(clean).split(esc("[REDACTED: suspected injected instruction]")).join('<span class="redacted">[REDACTED: suspected injected instruction]</span>');
+      $("#guard-output").innerHTML = `<p>${html}</p>` + (flags.length ? `<ul class="small">${flags.map(f => `<li><code>${esc(f.rule)}</code>${f.category ? " · " + esc(f.category) : ""} · nguồn <code>${esc(f.source)}</code></li>`).join("")}</ul>` : `<p class="muted small">Không có câu nào bị che.</p>`)
+        + (note ? `<p class="muted small">${note}</p>` : "");
     };
-    $("#guard-input").addEventListener("input", run);
+    const run = async () => {
+      const text = input.value;
+      try {
+        const r = await fetch("api/sanitize", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({text, source: "user"})});
+        if (!r.ok) throw new Error(r.status);
+        const j = await r.json();
+        show(j.clean, j.flags, "Kết quả của hàm <code>sanitize()</code> thật trên máy chủ.");
+      } catch {
+        const a = byId[sel.value];
+        if (a && a.text === text) show(a.neutralised.sanitizer ? "[REDACTED: suspected injected instruction]" : text, [], `Kết quả đã ghi: ${a.neutralised.sanitizer ? "bị vô hiệu" : "lọt qua bộ lọc"} (không có máy chủ). Chạy <code>critic-agent serve</code> để thử văn bản tự nhập.`);
+        else $("#guard-output").innerHTML = `<p class="muted">Cần chạy <code>uv run critic-agent serve</code> để thử văn bản tự nhập bằng guardrail thật.</p>`;
+      }
+    };
+    sel.addEventListener("change", () => { if (sel.value) { input.value = byId[sel.value].text; run(); } });
+    $("#guard-run").addEventListener("click", run);
     run();
   }
 
   // ------------------------------------------------------------------ boot
   (async function boot() {
-    [data.system, data.index, data.graph, data.summary, data.agreement] = await Promise.all(
-      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json"].map(getJSON));
+    [data.system, data.index, data.graph, data.summary, data.agreement, data.injection] = await Promise.all(
+      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json", "data/injection_eval.json"].map(getJSON));
     renderOverview();
     renderArchitecture();
     setupPlayer();

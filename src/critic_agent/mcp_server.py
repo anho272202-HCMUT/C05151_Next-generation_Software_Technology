@@ -25,7 +25,7 @@ from mcp_types import ToolAnnotations
 
 from .config import load_settings
 from .graph_store import MAX_NODES, JsonGraphStore
-from .guardrail import sanitize
+from .guardrail import clean_paper
 from .pdf_parser import parse_pdf, split_sentences
 from .permissions import check_token
 from .retrieval import HashEmbedder, OllamaEmbedder, PaperIndex, build_chunks
@@ -81,12 +81,7 @@ def pdf_ingest(path: str) -> str:
     paper = parse_pdf(_allowed_pdf(path))
     flags = []
     if settings.guardrail:
-        flags += [{"source": "pdf-hidden", "page": h.page, "snippet": h.text[:160]} for h in paper.hidden_spans]
-        pages = []
-        for page_no, text in enumerate(paper.visible_pages, start=1):
-            clean, page_flags = sanitize(text, "pdf", page_no)
-            pages.append(clean)
-            flags += [f.to_dict() for f in page_flags]
+        pages, flags = clean_paper(paper)
     else:
         pages = paper.raw_pages
     sentences = split_sentences(pages)

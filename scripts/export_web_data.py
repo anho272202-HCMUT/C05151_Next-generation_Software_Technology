@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 from critic_agent.config import AXES, PROJECT_ROOT, load_settings
-from critic_agent.guardrail import INJECTION_PATTERNS
+from critic_agent.guardrail import RULES
 from critic_agent.permissions import TOOL_POLICY
 from critic_agent.prompts import AXIS_GUIDE
 
@@ -62,11 +62,13 @@ def _trim(value):
 def main() -> None:
     settings = load_settings()
     runs_out = WEB_DATA / "runs"
-    if runs_out.exists():
-        shutil.rmtree(runs_out)
-    runs_out.mkdir(parents=True)
     index = []
-    for (stem, mode), run_dir in sorted(_candidates(settings.runs_dir).items()):
+    candidates = _candidates(settings.runs_dir) if settings.runs_dir.exists() else {}
+    if candidates:  # without local runs keep the recorded traces that are committed in web/data/
+        if runs_out.exists():
+            shutil.rmtree(runs_out)
+        runs_out.mkdir(parents=True)
+    for (stem, mode), run_dir in sorted(candidates.items()):
         run = _load_run(run_dir)
         if run is None:
             continue
@@ -77,7 +79,8 @@ def main() -> None:
                       "latency_s": f.get("wall_latency_s"), "llm_calls": f["cost"]["calls"],
                       "tokens": f["cost"]["input_tokens"] + f["cost"]["output_tokens"],
                       "events": len(run["events"])})
-    (WEB_DATA / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
+    if candidates:
+        (WEB_DATA / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
 
     graph = settings.graph_path
     if graph.exists():
@@ -94,7 +97,7 @@ def main() -> None:
         "axes": [{"id": a, "guide": AXIS_GUIDE[a]} for a in AXES],
         "tools": [{"name": n, "level": p.level.value, "agents": sorted(p.agents), "needs_approval": p.needs_approval,
                    "description": p.description} for n, p in TOOL_POLICY.items()],
-        "injection_patterns": INJECTION_PATTERNS,
+        "guardrail": {"rules": [{"id": r.id, "category": r.category, "gated": r.gated} for r in RULES]},
         "model": settings.llm_model,
     }
     (WEB_DATA / "system.json").write_text(json.dumps(system, indent=1, ensure_ascii=False))

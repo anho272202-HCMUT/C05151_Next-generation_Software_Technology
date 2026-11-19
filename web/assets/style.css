@@ -48,6 +48,7 @@ footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 20
 .btn:disabled { opacity: .5; cursor: wait; }
 
 .cards { display: grid; gap: 12px; } .cards.five { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.cards.four { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .cards.three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } .cards.two { grid-template-columns: 1fr 1fr; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
 .card p { margin: 6px 0 0; font-size: 14px; } .card .big { font-size: 30px; font-weight: 650; color: var(--accent); }
@@ -144,3 +145,8 @@ textarea { width: 100%; font: inherit; padding: 10px; border-radius: 10px; borde
   main, .topbar { padding-left: 16px; padding-right: 16px; }
   h1 { font-size: 23px; }
 }
+
+.guard-controls { display: flex; gap: 8px; margin: 8px 0; }
+.guard-controls select { flex: 1; min-width: 0; }
+td.num { text-align: center; font-variant-numeric: tabular-nums; }
+svg .band-caption { font-size: 11px; fill: var(--muted, #888); letter-spacing: .3px; }

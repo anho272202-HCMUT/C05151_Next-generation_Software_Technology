@@ -13,8 +13,10 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from .config import PROJECT_ROOT, load_settings
+from .guardrail import RULES, sanitize
 from .pipeline import run_review
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -26,6 +28,19 @@ _run_lock = asyncio.Lock()  # one live run at a time: a local model cannot serve
 async def health() -> dict:
     s = load_settings()
     return {"ok": True, "model": s.llm_model, "provider": s.llm_provider, "busy": _run_lock.locked()}
+
+
+class SanitizeRequest(BaseModel):
+    text: str = Field(max_length=20000)
+    source: str = "user"
+
+
+@app.post("/api/sanitize")
+async def sanitize_text(req: SanitizeRequest) -> dict:
+    """Run the real guardrail on a text (the web security tab uses this; nothing is stored or sent to an LLM)."""
+    clean, flags = sanitize(req.text, req.source)
+    category = {r.id: r.category for r in RULES}
+    return {"clean": clean, "flags": [{**f.to_dict(), "category": category.get(f.rule, "")} for f in flags]}
 
 
 @app.get("/api/papers")

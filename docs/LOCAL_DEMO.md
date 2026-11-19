@@ -29,7 +29,7 @@ uv run critic-agent serve             # mở http://localhost:8000
 | **Chạy demo** | Chọn một lượt đã ghi rồi bấm **▶ Phát** (có thể lùi / tiến từng bước), hoặc chọn bài báo rồi bấm **▶ Chạy LIVE** để hệ thống phân tích thật trên máy (khoảng 2–3 phút/bài với qwen2.5:3b) |
 | Đồ thị tri thức | Bấm vào Agentless để thấy cạnh CONTRADICTS và hồ sơ nguồn trích dẫn |
 | Kết quả đánh giá | Số liệu Full so với baseline, sau khi chạy đánh giá |
-| An ninh | Dán một đoạn văn có chỉ thị độc hại vào ô thử guardrail |
+| An ninh | Bảng đo chống prompt injection (trước/sau), chọn một mẫu tấn công hoặc dán đoạn văn vào ô thử: khi chạy `critic-agent serve`, ô này gọi đúng hàm `sanitize()` của hệ thống |
 
 **Phương án dự phòng:** nếu chạy live bị lỗi (Ollama chưa chạy, máy chậm), chuyển sang phát lại lượt đã ghi. Lượt ghi sẵn
 không cần mạng và không cần model. Chỉ cần mở trang tĩnh: `python3 -m http.server 8765 --directory web` rồi vào http://localhost:8765.

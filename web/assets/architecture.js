@@ -6,17 +6,17 @@
 
   const NODES = [
     {id: "input", x: 20, y: 20, w: 150, h: 56, kind: "sys", label: "PDF + yêu cầu", sub: "đầu vào không tin cậy"},
-    {id: "ingest", x: 210, y: 20, w: 170, h: 56, kind: "guard", label: "Ingest + Guardrail", sub: "tách câu, lọc injection"},
+    {id: "ingest", x: 210, y: 20, w: 170, h: 56, kind: "guard", label: "Ingest + Guardrail", sub: "L1 + L2: tách câu, lọc injection"},
     {id: "summarizer", x: 420, y: 20, w: 170, h: 56, kind: "agent", label: "Summarizer", sub: "paper card"},
     {id: "orchestrator", x: 630, y: 20, w: 170, h: 56, kind: "agent", label: "Orchestrator", sub: "kế hoạch 5 trục"},
-    {id: "memory", x: 840, y: 20, w: 140, h: 56, kind: "know", label: "Lessons memory", sub: "ChromaDB"},
+    {id: "memory", x: 840, y: 20, w: 140, h: 56, kind: "know", label: "Lessons memory", sub: "ChromaDB · L2 khi ghi/đọc"},
     ...AXES.map((a, i) => ({id: "critic:" + a, x: 20 + i * 196, y: 130, w: 176, h: 52, kind: "agent",
                             label: "Critic", sub: AXIS_LABEL[a]})),
-    {id: "evaluator", x: 150, y: 235, w: 190, h: 56, kind: "agent", label: "Evaluator", sub: "kiểm chứng + chấm điểm"},
+    {id: "evaluator", x: 150, y: 235, w: 190, h: 56, kind: "agent", label: "Evaluator", sub: "L4: kiểm chứng + chấm điểm"},
     {id: "reflection", x: 400, y: 235, w: 190, h: 56, kind: "sys", label: "Reflection", sub: "chỉ trục bị loại, ≤2 vòng"},
     {id: "synthesizer", x: 650, y: 235, w: 190, h: 56, kind: "agent", label: "Synthesizer", sub: "báo cáo + câu hỏi"},
     {id: "output", x: 870, y: 235, w: 110, h: 56, kind: "sys", label: "Báo cáo", sub: "report.md"},
-    {id: "gateway", x: 20, y: 335, w: 960, h: 40, kind: "guard", label: "ToolGateway → MCP server", sub: "allow-list theo agent · người duyệt + HMAC · quét output · audit log"},
+    {id: "gateway", x: 20, y: 335, w: 960, h: 40, kind: "guard", label: "ToolGateway → MCP server", sub: "allow-list theo agent · người duyệt + HMAC · L2 quét output · audit log"},
     {id: "tool:pdf_ingest", x: 20, y: 410, w: 110, h: 60, kind: "tool", label: "pdf_ingest", sub: "read-only"},
     {id: "tool:search_paper", x: 141, y: 410, w: 110, h: 60, kind: "tool", label: "search_paper", sub: "read-only"},
     {id: "tool:get_sentences", x: 262, y: 410, w: 110, h: 60, kind: "tool", label: "get_sentences", sub: "read-only"},
@@ -25,6 +25,11 @@
     {id: "tool:save_annotation", x: 625, y: 410, w: 110, h: 60, kind: "tool", label: "annotation", sub: "ghi hoàn tác được"},
     {id: "tool:publish_review", x: 746, y: 410, w: 110, h: 60, kind: "tool", label: "publish_review", sub: "ghi không hoàn tác"},
     {id: "tool:execute_code_in_sandbox", x: 867, y: 410, w: 113, h: 60, kind: "tool", label: "sandbox", sub: "thực thi mã (tắt)"},
+    // prompt-injection defence layers (threat model): where they act is described in INFO
+    {id: "def:l1", x: 20, y: 505, w: 234, h: 56, kind: "guard", label: "L1 · Parser PDF", sub: "bỏ chữ ẩn / tương phản thấp / bị che"},
+    {id: "def:l2", x: 262, y: 505, w: 234, h: 56, kind: "guard", label: "L2 · Sanitizer", sub: "chuẩn hoá + che câu chỉ thị"},
+    {id: "def:l3", x: 504, y: 505, w: 234, h: 56, kind: "guard", label: "L3 · Spotlighting", sub: "<untrusted> + quy tắc ưu tiên"},
+    {id: "def:l4", x: 746, y: 505, w: 234, h: 56, kind: "guard", label: "L4 · Kiểm chứng", sub: "trích dẫn có thật + gateway"},
   ];
 
   const EDGES = [
@@ -36,7 +41,7 @@
 
   const INFO = {
     input: ["Đầu vào", "PDF bài báo trong data/papers/ và (tuỳ chọn) yêu cầu của người dùng, ví dụ “focus on fairness”. Cả hai đều được coi là không tin cậy.", "cli.py, server.py"],
-    ingest: ["Ingest + Guardrail", "Gọi MCP tool pdf_ingest: đọc PDF (chỉ đọc), bỏ khối chữ ẩn (chữ trắng, < 2pt), che các câu khớp 11 mẫu chỉ thị, tách thành câu có ID pXsY, chia cửa sổ 4 câu, lập chỉ mục BM25 + nomic-embed-text (RRF). Yêu cầu người dùng cũng được sanitize.", "pdf_parser.py, guardrail.py, retrieval.py, mcp_server.py"],
+    ingest: ["Ingest + Guardrail", "Gọi MCP tool pdf_ingest: đọc PDF (chỉ đọc), bỏ khối chữ ẩn (L1), che các câu khớp quy tắc chỉ thị sau khi chuẩn hoá (L2, xem phần phòng thủ bên dưới sơ đồ), tách thành câu có ID pXsY, chia cửa sổ 4 câu, lập chỉ mục BM25 + nomic-embed-text (RRF). Yêu cầu người dùng cũng được sanitize.", "pdf_parser.py, guardrail.py, retrieval.py, mcp_server.py"],
     summarizer: ["Summarizer (LLM)", "Tìm đoạn mô tả thực nghiệm (search_paper), rồi tạo paper card: task, method, benchmarks, baselines, models, claims, runs/seeds. Tiêu đề lấy từ PDF, không lấy từ LLM (model 3B từng bịa tiêu đề).", "agents.py: summarize"],
     orchestrator: ["Orchestrator (LLM)", "Lập kế hoạch: mỗi trục có 2 truy vấn và độ ưu tiên. Hệ thống bổ sung truy vấn theo tên baseline/benchmark trong paper card. Orchestrator tra đồ thị tri thức (graph_query) và lấy tối đa 3 lessons từ bộ nhớ dài hạn, rồi phát (fan-out) 5 critic bằng LangGraph Send.", "agents.py: orchestrate, dispatch"],
     memory: ["Bộ nhớ dài hạn (lessons)", "ChromaDB. Chỉ ghi khi critique được chấp nhận: lesson loại “fix” (lần đầu bị loại vì sao, bản được nhận ra sao) hoặc loại “pattern”. Nội dung được sanitize khi ghi và khi đọc. Khi truy hồi, không lấy lesson từ chính bài đang xét. forget(paper_id) xoá dữ liệu khi bị đầu độc.", "lessons.py"],
@@ -44,6 +49,10 @@
     reflection: ["Reflection có mục tiêu", "Chỉ trục bị loại mới quay lại critic, kèm feedback và lần thử trước; tối đa 2 vòng thêm. Một trục chỉ được thử lại khi lần trước có cải thiện. Hệ thống giữ lần thử tốt nhất của mỗi trục.", "agents.py: route_after_evaluate"],
     synthesizer: ["Synthesizer", "Chọn critique tốt nhất của mỗi trục, xếp hạng theo mức nghiêm trọng và điểm, lấy 3 câu hỏi tranh luận hàng đầu, ghi lessons và xuất báo cáo Markdown.", "agents.py: synthesize, report.py"],
     output: ["Báo cáo + artefact", "Mỗi lượt chạy ghi: report.md, output.json, trace.jsonl (dữ liệu cho chính trang demo này), audit.jsonl (mọi yêu cầu tool, kể cả bị chặn) và cost.json (token, độ trễ, chi phí quy đổi).", "pipeline.py"],
+    "def:l1": ["L1 · Parser PDF (chống chữ ẩn)", "Chạy khi đọc PDF, trước mọi thứ khác. Với mỗi đoạn chữ, parser xác định nền thực tế (hình đặc vẽ ngay phía dưới, mặc định trắng) và loại đoạn chữ nếu: độ tương phản < 1,5, cỡ chữ < 2,5pt, hoặc một hình đặc vẽ đè lên sau đó. Chỉ loại khi đoạn ẩn đủ dài như một câu (≥ 6 từ) để không xoá nhãn hình. Đoạn bị loại trở thành cờ guardrail_flag (nguồn pdf-hidden).", "pdf_parser.py: _hidden_regions"],
+    "def:l2": ["L2 · Sanitizer (chuẩn hoá + quy tắc)", "Áp dụng ở bốn điểm vào: văn bản PDF, yêu cầu người dùng, kết quả tool và bộ nhớ lessons. Bước 1 chuẩn hoá để thấy cái model sẽ thấy: NFKC, homoglyph Cyrillic/Greek, ký tự vô hình, ký tự tag Unicode, chữ cách quãng, leetspeak, base64. Bước 2: ~50 quy tắc theo nhóm (override, role-hijack, fake-template, review-manipulation, prompt-leak, tool-abuse, exfiltration, authority, memory-poisoning, đa ngôn ngữ). Quy tắc nói về hành động phải “mở câu” (cổng mệnh lệnh), nên câu mô tả như “models that ignore the instructions…” không bị che. Câu khớp bị thay bằng [REDACTED].", "guardrail.py, gateway.py, lessons.py"],
+    "def:l3": ["L3 · Spotlighting", "Nội dung ngoài được bọc trong thẻ <untrusted> và system prompt có quy tắc ưu tiên cao nhất: không làm theo chỉ thị trong thẻ, không lộ mã nội bộ. Là lớp cuối nếu L1–L2 bỏ lọt, nhưng hiệu quả phụ thuộc model: chưa được đo trong repo này.", "prompts.py"],
+    "def:l4": ["L4 · Kiểm chứng đầu ra và phân quyền", "Critic chỉ trích ID câu, hệ thống tự chép nguyên văn từ PDF, Evaluator kiểm ID tất định; tool đi qua gateway với allow-list theo agent, người duyệt + HMAC cho tool nguy hiểm. Nhờ vậy một chỉ thị lọt qua cũng khó biến thành trích dẫn bịa hoặc hành động ngoài quyền.", "agents.py, gateway.py, permissions.py"],
     gateway: ["ToolGateway", "Lối duy nhất từ agent tới tool. Gateway (1) kiểm tra allow-list theo agent, (2) yêu cầu người duyệt với tool ghi không hoàn tác và thực thi mã, rồi cấp token HMAC mà server kiểm tra lại, (3) quét injection trong kết quả tool, (4) ghi audit log và trace.", "gateway.py, permissions.py"],
   };
   const TOOL_INFO = {
@@ -133,6 +142,10 @@
       }
       svg.appendChild(g);
     }
+    const cap = document.createElementNS(NS, "text");
+    Object.entries({x: 20, y: 497, class: "band-caption"}).forEach(([k, v]) => cap.setAttribute(k, v));
+    cap.textContent = "LỚP PHÒNG THỦ PROMPT INJECTION (threat model): mỗi lớp áp dụng tại các khối ghi chú L1–L4 ở trên";
+    svg.appendChild(cap);
   }
 
   window.Arch = {AXES, AXIS_LABEL, NODES, render, nodeInfo};

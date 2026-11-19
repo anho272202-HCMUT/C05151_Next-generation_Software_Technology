@@ -4,7 +4,7 @@
 
 | Node | Agent | Does | Tools (via gateway) |
 |---|---|---|---|
-| `ingest` | — | parse PDF into numbered sentences, sanitise, index; sanitise user request | `pdf_ingest` |
+| `ingest` | — | parse PDF into numbered sentences, drop hidden text (L1), sanitise (L2), index; sanitise user request | `pdf_ingest` |
 | `summarize` | Summarizer | paper card: task, method, benchmarks, baselines, models, claims, runs/seeds, code URL | `search_paper` |
 | `orchestrate` | Orchestrator | per-axis priority + queries (LLM), enriched with card entities; optional graph lookup | `graph_query` |
 | `critic` ×5 | Critic workers | one per axis, run in parallel with `Send`; fill an evidence window, write one critique citing sentence ids | `search_paper` |
@@ -16,6 +16,22 @@ Targeted reflection: only rejected axes go back to `critic`, with the evaluator'
 
 State fields: `paper_id, card, plan, graph_facts, lessons, round, pending, critiques (append-only reducer), best,
 feedback, final`.
+
+## Prompt-injection defence (threat model)
+
+Untrusted content enters at four points (PDF text, user request, tool output, memory). Four layers act on it; the full
+threat model, attack set and measurements are in `docs/threat_model.md`.
+
+| Layer | Where in the pipeline | Code |
+|---|---|---|
+| L1 hidden-text removal | `ingest` → `pdf_ingest` → `parse_pdf`: text with contrast < 1.5, size < 2.5 pt, covered or transparent is dropped | `pdf_parser.py` |
+| L2 normalise + redact | `pdf_ingest` (every page), `ingest` (user request), `ToolGateway._scan_output` (every tool result), `LessonStore` (write and read) | `guardrail.py` |
+| L3 spotlighting | every prompt wraps external text in `<untrusted>`; system prompt carries the security rules | `prompts.py` |
+| L4 verification | citations are copied from the PDF by id; evaluator checks ids; gateway allow-lists tools | `agents.py`, `gateway.py` |
+
+A redaction emits a `guardrail_flag` trace event (`source`, `page`, `snippet`, `rule`), shown in the Explorer and counted
+in `report.md`. `CRITIC_GUARDRAIL=0` (or `--no-guardrail`) disables L1-L3 for the control experiment.
+`python -m critic_agent.injection_eval` measures L1/L2 against `eval/injections.json` and `eval/benign.json`.
 
 ## Tool permission levels (`src/critic_agent/permissions.py`)
 
