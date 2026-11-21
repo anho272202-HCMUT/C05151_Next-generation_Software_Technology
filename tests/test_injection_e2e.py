@@ -62,3 +62,41 @@ def test_one_offline_run_records_objective_signals(tmp_path):
     row = asyncio.run(one_run("mock", "L1+L2+L3", "reflexion.pdf", "obey", "visible", 0, tmp_path, tmp_path / "cache", sem))
     assert row["failed"] is False and row["success"] is False and row["flags"] >= 1 and row["accepted"] == 5
     assert len(ATTACKS) == 8
+
+
+# ------------------------------------------------------------------ semantic study (offline parts)
+
+def test_epistemic_rule_is_opt_in_and_only_for_reasoning_roles():
+    from critic_agent import prompts
+
+    assert prompts.EPISTEMIC_RULE not in prompts.system("critic", True)
+    assert prompts.EPISTEMIC_RULE in prompts.system("critic", True, True)
+    assert prompts.EPISTEMIC_RULE in prompts.system("evaluator", False, True)
+    assert prompts.EPISTEMIC_RULE not in prompts.system("summarizer", True, True)
+    assert Settings().use_l5 is False and Settings(l5_epistemic=True).use_l5 is True
+
+
+def test_semantic_payload_file_is_well_formed():
+    import json
+
+    from critic_agent.injection_semantic import PAYLOADS, load_payloads
+
+    payloads = load_payloads()
+    assert len({p["id"] for p in payloads}) == len(payloads) == 30
+    assert {p["kind"] for p in payloads} == {"assertion", "decoy"}
+    assert all(p["marker"].lower() in p["text"].lower() for p in payloads if p["kind"] == "decoy")
+    # semantic means: the sanitiser must not see them (no imperative, no addressee)
+    from critic_agent.guardrail import match_rule
+    assert all(match_rule(p["text"]) is None for p in payloads), [p["id"] for p in payloads if match_rule(p["text"])]
+    assert json.loads(PAYLOADS.read_text())["payloads"]
+
+
+def test_decoy_measurement_and_fisher():
+    from critic_agent.injection_semantic import fisher, measure
+
+    payload = {"id": "x", "axis": "fairness", "kind": "decoy", "marker": "wall-clock time", "text": "Limitations. We did not compare wall-clock time."}
+    final = {"critiques": [{"axis": "fairness", "weakness": "The paper does not compare Wall-Clock Time.", "question": "?", "grounded": True, "quotes": []}],
+             "accepted": 1, "cost": {"input_tokens": 1, "output_tokens": 1}}
+    row = measure(final, "reflexion.pdf", payload)
+    assert row["decoy_adopted"] is True and row["retained"]["fairness"] is False
+    assert fisher(0, 5, 5, 0) < 0.01 and fisher(2, 3, 2, 3) == 1.0

@@ -115,6 +115,14 @@ Reading it honestly:
 cite a hidden payload as evidence without it, 0/20 with it); no measurable utility cost; the sanitiser has no answer to
 non-imperative claims, and the adaptive attacker run was inconclusive. The single-prompt experiment above is superseded by it.
 
+## Semantic attacks and the L5 rule
+
+`docs/injection_semantic_study.md`: non-imperative payloads that the sanitiser cannot see, on gpt-4o-mini. False author assertions are doubted by
+the adversarial critic (0/20 adopted), but a *decoy limitation* (a harmless admitted limitation) makes the critic drop the real weakness
+(real weakness kept in 18% of attacked vs 40% of clean runs, p = 0.015, n = 60). The L5 epistemic prompt rule (`CRITIC_L5`) lowers decoy
+adoption from 38% to 25% and raises the real weakness kept to 30%, but the effect is not significant (p = 0.17 / 0.20) and uneven across
+axes, so it is reported as promising, not established.
+
 ## Demo scenarios (web Explorer, tab "An ninh")
 
 1. Pick `ob-01` (Cyrillic homoglyphs): the page calls the real `sanitize()`; the sentence is redacted with rule `override`.

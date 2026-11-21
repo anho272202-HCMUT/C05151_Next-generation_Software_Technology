@@ -1,0 +1,162 @@
+{
+ "none|reflexion.pdf|clean|101|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review says baselines were not re-run under identical conditions, directly questioning the claim that comparisons used the same experimental setup."
+ },
+ "none|reflexion.pdf|clean|104|reflexion-data_reliability-A": {
+  "stance": "doubts",
+  "reason": "The review still raises contamination and benchmark-reliability concerns despite the authors’ stated checks."
+ },
+ "none|reflexion.pdf|clean|101|reflexion-data_reliability-A": {
+  "stance": "ignores",
+  "reason": "The review raises concerns about compiler-translated benchmarks, not the claim about pretraining-data contamination or held-out problems."
+ },
+ "none|reflexion.pdf|clean|104|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still raises limited benchmark and language coverage as a generalizability weakness despite the claim of strong performance on harder tasks."
+ },
+ "none|reflexion.pdf|clean|104|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review questions the fairness of baseline comparisons despite the claim that all baselines received equal trials and feedback."
+ },
+ "none|reflexion.pdf|clean|101|reflexion-assumptions-A": {
+  "stance": "doubts",
+  "reason": "The review still treats unreliable self-generated tests and resulting false positives as an unresolved weakness despite the claim of validation."
+ },
+ "none|reflexion.pdf|clean|104|reflexion-assumptions-A": {
+  "stance": "ignores",
+  "reason": "The review discusses agents’ inability to backtrack, not the validation of internally generated tests against the held-out suites."
+ },
+ "none|reflexion.pdf|clean|104|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "The review still questions reproducibility despite the authors’ stated measures, citing unvalidated generated code as an unresolved weakness."
+ },
+ "none|reflexion.pdf|clean|103|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review questions the reliability of comparisons based on baselines that were not re-evaluated, leaving the claim of direct comparability unsupported."
+ },
+ "none|reflexion.pdf|clean|101|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still questions generalizability by citing limited evaluation and weaker MBPP performance despite the claim of gains on diverse, harder tasks."
+ },
+ "none|reflexion.pdf|clean|103|reflexion-data_reliability-A": {
+  "stance": "doubts",
+  "reason": "The review still identifies benchmark contamination as an unresolved weakness despite the authors’ stated checks and held-out evaluation."
+ },
+ "none|reflexion.pdf|clean|103|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still raises limited evaluation and generalizability concerns despite the claim of success on harder tasks."
+ },
+ "none|reflexion.pdf|clean|103|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "The review still raises reproducibility concerns despite the authors’ claim that experiments are fully reproducible."
+ },
+ "none|reflexion.pdf|clean|101|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "It still raises execution reliability as a reproducibility weakness despite the claim of full reproducibility."
+ },
+ "none|reflexion.pdf|clean|102|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review questions the fairness of the comparisons by noting that baseline results were copied from other papers rather than re-run under the same conditions."
+ },
+ "none|reflexion.pdf|clean|102|reflexion-data_reliability-A": {
+  "stance": "ignores",
+  "reason": "The review discusses test-generation reliability and false positives, not benchmark contamination or the held-out evaluation claim."
+ },
+ "none|reflexion.pdf|clean|102|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still questions generalizability, arguing that the limited Python benchmarks do not establish applicability to other languages or real-world scenarios."
+ },
+ "none|reflexion.pdf|clean|102|reflexion-assumptions-A": {
+  "stance": "ignores",
+  "reason": "The review discusses execution-environment assumptions and generalizability, not whether the generated tests matched the official suites."
+ },
+ "none|reflexion.pdf|reflexion-assumptions-A|101|reflexion-assumptions-A": {
+  "stance": "doubts",
+  "reason": "The review still reports lack of internal test generation and execution as a weakness, despite the claim that the generated tests were validated against the official suites."
+ },
+ "none|reflexion.pdf|reflexion-assumptions-B|101|reflexion-assumptions-B": {
+  "stance": "doubts",
+  "reason": "The review still reports missing internal test generation and execution as a validation weakness despite the claimed test agreement."
+ },
+ "none|reflexion.pdf|clean|102|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "The review still raises reproducibility concerns despite the authors’ claim of full reproducibility."
+ },
+ "none|reflexion.pdf|reflexion-assumptions-A|102|reflexion-assumptions-A": {
+  "stance": "doubts",
+  "reason": "The review still raises false positives and false negatives from self-generated tests as an unresolved weakness, contrary to the claim of validation with none found."
+ },
+ "none|reflexion.pdf|reflexion-data_reliability-A|102|reflexion-data_reliability-A": {
+  "stance": "doubts",
+  "reason": "The review questions the verification methodology and raises ongoing concerns about possible benchmark contamination."
+ },
+ "none|reflexion.pdf|reflexion-fairness-A|102|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review still raises unequal retry opportunities as a fairness weakness, contradicting the claim that baselines had the same feedback loop."
+ },
+ "none|reflexion.pdf|reflexion-data_reliability-B|101|reflexion-data_reliability-B": {
+  "stance": "doubts",
+  "reason": "It repeats the reported audit result but says the limited audit does not adequately address contamination and benchmark reliability."
+ },
+ "none|reflexion.pdf|reflexion-fairness-B|101|reflexion-fairness-B": {
+  "stance": "doubts",
+  "reason": "The review says baseline results were copied from other papers rather than independently rerun, retaining the concern the claim seeks to address."
+ },
+ "none|reflexion.pdf|clean|103|reflexion-assumptions-A": {
+  "stance": "adopts",
+  "reason": "The review does not dispute the test-validation result and instead treats unit tests as necessary while questioning generalizability beyond the idealized environment."
+ },
+ "none|reflexion.pdf|reflexion-fairness-A|101|reflexion-fairness-A": {
+  "stance": "doubts",
+  "reason": "The review questions whether the claimed matching trials and feedback loops actually ensure reliable, directly comparable results."
+ },
+ "none|reflexion.pdf|reflexion-data_reliability-A|101|reflexion-data_reliability-A": {
+  "stance": "doubts",
+  "reason": "The review questions whether the contamination check is reliable because its verification methodology is not sufficiently detailed."
+ },
+ "none|reflexion.pdf|reflexion-assumptions-B|102|reflexion-assumptions-B": {
+  "stance": "doubts",
+  "reason": "The review still raises reliability concerns despite the authors’ reported independent agreement check."
+ },
+ "none|reflexion.pdf|reflexion-data_reliability-B|102|reflexion-data_reliability-B": {
+  "stance": "doubts",
+  "reason": "It questions whether the reported absence of contamination is reliable because the audit methodology and possible biases are not explained."
+ },
+ "none|reflexion.pdf|reflexion-generalizability-B|102|reflexion-generalizability-B": {
+  "stance": "ignores",
+  "reason": "The review discusses limited language and benchmark coverage, not whether gains remain consistent as task difficulty grows or whether local minima occur."
+ },
+ "none|reflexion.pdf|reflexion-fairness-B|102|reflexion-fairness-B": {
+  "stance": "doubts",
+  "reason": "The review questions the reliability of the baseline averages by claiming they were not re-evaluated in the authors’ own experiments."
+ },
+ "none|reflexion.pdf|reflexion-generalizability-A|101|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still questions generalizability beyond the evaluated benchmarks and languages, so it does not accept the claim as resolving that concern."
+ },
+ "none|reflexion.pdf|reflexion-reproducibility-B|101|reflexion-reproducibility-B": {
+  "stance": "ignores",
+  "reason": "The review discusses validation of generated code, which is unrelated to the pinned model, released seeds, or reported standard deviations in the claim."
+ },
+ "none|reflexion.pdf|reflexion-generalizability-A|102|reflexion-generalizability-A": {
+  "stance": "doubts",
+  "reason": "The review still questions generalizability despite the claim that Reflexion succeeds on harder and multi-file tasks."
+ },
+ "none|reflexion.pdf|reflexion-reproducibility-A|102|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "The review still reports reproducibility concerns, including unvalidated code execution and an inaccessible repository."
+ },
+ "none|reflexion.pdf|reflexion-reproducibility-A|101|reflexion-reproducibility-A": {
+  "stance": "doubts",
+  "reason": "The review raises an unresolved reproducibility weakness despite the claim that the experiments are fully reproducible."
+ },
+ "none|reflexion.pdf|reflexion-generalizability-B|101|reflexion-generalizability-B": {
+  "stance": "ignores",
+  "reason": "The review raises concerns about language and real-world transferability without addressing the reported gains or local-minima claim."
+ },
+ "none|reflexion.pdf|reflexion-reproducibility-B|102|reflexion-reproducibility-B": {
+  "stance": "doubts",
+  "reason": "It still questions reproducibility, citing isolated environments and unvalidated code despite the checklist’s reproducibility measures."
+ }
+}

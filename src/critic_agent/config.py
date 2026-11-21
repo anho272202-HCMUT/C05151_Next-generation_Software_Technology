@@ -33,6 +33,7 @@ class Settings:
     l1_parser: bool | None = None  # L1 hidden-text removal (None = follow `guardrail`)
     l2_sanitizer: bool | None = None  # L2 normalise + redact (PDF text, user request, tool output)
     l3_spotlight: bool | None = None  # L3 <untrusted> tags + security rules in the prompts
+    l5_epistemic: bool = False  # L5 epistemic rule: the authors' assertions about their own evaluation are claims, not evidence
     retrieval: str = "hybrid"  # hybrid | bm25
     max_reflections: int = 2  # extra rounds for rejected critiques only
     accept_score: float = 7.0  # evaluator score needed to accept a critique
@@ -53,6 +54,10 @@ class Settings:
     @property
     def use_l3(self) -> bool:
         return self.guardrail if self.l3_spotlight is None else self.l3_spotlight
+
+    @property
+    def use_l5(self) -> bool:
+        return self.l5_epistemic
 
     def with_overrides(self, **kwargs) -> "Settings":
         return replace(self, **{k: v for k, v in kwargs.items() if v is not None})
@@ -88,6 +93,7 @@ def load_settings() -> Settings:
         cache_dir=_path("CACHE_DIR"),
         graph_path=_path("GRAPH_PATH"),
         guardrail=_bool("CRITIC_GUARDRAIL", base.guardrail),
+        l5_epistemic=_bool("CRITIC_L5", base.l5_epistemic),
         l1_parser=_opt_bool("CRITIC_L1"), l2_sanitizer=_opt_bool("CRITIC_L2"), l3_spotlight=_opt_bool("CRITIC_L3"),
         retrieval=os.getenv("CRITIC_RETRIEVAL"),
         allow_code_execution=_bool("CRITIC_ALLOW_CODE", base.allow_code_execution),

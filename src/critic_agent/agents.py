@@ -62,7 +62,7 @@ class RunContext:
 
         Returns {} after MAX_LLM_ATTEMPTS so one bad generation degrades a step instead of crashing the run.
         """
-        system = prompts.system(role, self.settings.use_l3)
+        system = prompts.system(role, self.settings.use_l3, self.settings.use_l5)
         for attempt in range(MAX_LLM_ATTEMPTS):
             self._calls += 1
             try:

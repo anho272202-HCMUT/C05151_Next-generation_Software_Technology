@@ -117,5 +117,5 @@ def _save(run_dir: Path, final: dict, trace: Trace, tracker: CostTracker) -> Non
 
 def config_dict(s: Settings) -> dict:
     return {"provider": s.llm_provider, "model": s.llm_model, "temperature": s.temperature,
-            "max_reflections": s.max_reflections, "accept_score": s.accept_score, "guardrail": s.guardrail, "layers": {"l1": s.use_l1, "l2": s.use_l2, "l3": s.use_l3},
+            "max_reflections": s.max_reflections, "accept_score": s.accept_score, "guardrail": s.guardrail, "layers": {"l1": s.use_l1, "l2": s.use_l2, "l3": s.use_l3, "l5": s.use_l5},
             "retrieval": s.retrieval, "use_memory": s.use_memory, "use_graph": s.use_graph}
