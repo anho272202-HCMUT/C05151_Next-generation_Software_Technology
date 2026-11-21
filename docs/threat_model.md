@@ -107,6 +107,14 @@ Reading it honestly:
   end-to-end hidden-text PDF). The small local model of D2 (`qwen2.5:3b`), where defences are most likely to matter, has
   not been measured.
 
+## End-to-end study
+
+`docs/injection_e2e_study.md` measures full pipeline runs on PDFs carrying a payload (4 papers, ablation of L1/L2/L3 via
+`CRITIC_L1/L2/L3`, three models, objective success signals). Headline: instruction-style attacks succeeded in 0 of 184 runs
+(0 of 52 with no defence), so their effect cannot be reduced further; L1 removes the exposure to hidden text completely (13/20 runs
+cite a hidden payload as evidence without it, 0/20 with it); no measurable utility cost; the sanitiser has no answer to
+non-imperative claims, and the adaptive attacker run was inconclusive. The single-prompt experiment above is superseded by it.
+
 ## Demo scenarios (web Explorer, tab "An ninh")
 
 1. Pick `ob-01` (Cyrillic homoglyphs): the page calls the real `sanitize()`; the sentence is redacted with rule `override`.

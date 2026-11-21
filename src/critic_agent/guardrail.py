@@ -228,13 +228,16 @@ def sanitize(text: str, source: str, page: int | None = None) -> tuple[str, list
     return "".join(out), flags
 
 
-def clean_paper(paper) -> tuple[list[str], list[dict]]:
-    """Defence for one parsed PDF: drop hidden payload blocks (already split by the parser), then redact
-    instruction-like sentences page by page. Returns the clean pages and the flags as dicts."""
-    flags = [{"source": "pdf-hidden", "page": h.page, "snippet": h.text[:160], "rule": h.reason} for h in paper.hidden_spans]
+def clean_paper(paper, hidden: bool = True, sanitizer: bool = True) -> tuple[list[str], list[dict]]:
+    """Defence for one parsed PDF: L1 drops hidden payload blocks (already split by the parser), L2 redacts
+    instruction-like sentences page by page. Either layer can be switched off for ablations; with both off the pages are
+    what a naive extractor sees. Returns the clean pages and the flags as dicts."""
+    flags = [{"source": "pdf-hidden", "page": h.page, "snippet": h.text[:160], "rule": h.reason}
+             for h in paper.hidden_spans] if hidden else []
     pages = []
-    for page_no, text in enumerate(paper.visible_pages, start=1):
-        clean, page_flags = sanitize(text, "pdf", page_no)
-        pages.append(clean)
-        flags += [f.to_dict() for f in page_flags]
+    for page_no, text in enumerate(paper.visible_pages if hidden else paper.raw_pages, start=1):
+        if sanitizer:
+            text, page_flags = sanitize(text, "pdf", page_no)
+            flags += [f.to_dict() for f in page_flags]
+        pages.append(text)
     return pages, flags

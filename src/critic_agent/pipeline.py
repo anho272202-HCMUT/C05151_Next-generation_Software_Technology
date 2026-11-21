@@ -87,7 +87,7 @@ async def run_baseline(paper: str, settings: Settings, *, seed: int = 0, run_id:
                 if used < BASELINE_TOKEN_BUDGET:
                     lines.append(f"[{s['id']}] {s['text']}")
         ctx = RunContext(settings, build_llm(settings, tracker), gateway, tracker, trace, seed)
-        raw = await ctx.ask("baseline", "baseline", prompts.baseline_user("\n".join(lines), settings.guardrail),
+        raw = await ctx.ask("baseline", "baseline", prompts.baseline_user("\n".join(lines), settings.use_l3),
                             max_tokens=1200)
         known = {line[1:line.index("]")] for line in lines}
         critiques = []
@@ -117,5 +117,5 @@ def _save(run_dir: Path, final: dict, trace: Trace, tracker: CostTracker) -> Non
 
 def config_dict(s: Settings) -> dict:
     return {"provider": s.llm_provider, "model": s.llm_model, "temperature": s.temperature,
-            "max_reflections": s.max_reflections, "accept_score": s.accept_score, "guardrail": s.guardrail,
+            "max_reflections": s.max_reflections, "accept_score": s.accept_score, "guardrail": s.guardrail, "layers": {"l1": s.use_l1, "l2": s.use_l2, "l3": s.use_l3},
             "retrieval": s.retrieval, "use_memory": s.use_memory, "use_graph": s.use_graph}
