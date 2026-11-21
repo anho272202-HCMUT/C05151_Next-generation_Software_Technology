@@ -88,14 +88,28 @@ class OpenAILLM:
         self.model = settings.llm_model
         self._client = AsyncOpenAI(api_key=settings.openai_api_key)
         self._temperature = settings.temperature
+        self._send_temperature = True
         self._tracker = tracker
 
     async def complete(self, system, user, *, agent, seed=None, max_tokens=900):
+        from openai import BadRequestError
+
         start = time.perf_counter()
-        resp = await self._client.chat.completions.create(
-            model=self.model, temperature=self._temperature, seed=seed, max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+        # Newer models take max_completion_tokens (reasoning tokens count against it, hence the headroom) and
+        # accept only the default temperature; send the temperature once and drop it if the model refuses.
+        kwargs = dict(model=self.model, seed=seed, max_completion_tokens=max_tokens * 4,
+                      response_format={"type": "json_object"},
+                      messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+        if self._send_temperature:
+            kwargs["temperature"] = self._temperature
+        try:
+            resp = await self._client.chat.completions.create(**kwargs)
+        except BadRequestError as exc:
+            if "temperature" not in str(exc):
+                raise
+            kwargs.pop("temperature", None)
+            self._send_temperature = False
+            resp = await self._client.chat.completions.create(**kwargs)
         latency = time.perf_counter() - start
         u = resp.usage
         self._tracker.record(agent, self.model, u.prompt_tokens, u.completion_tokens, latency)

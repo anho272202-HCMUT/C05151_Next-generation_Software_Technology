@@ -73,9 +73,39 @@ Things to know when reading these numbers:
   see them. Only L3 and L4 can limit them, and measuring that needs a real model.
 - Parser-only 9/10 on hidden text: 3 pt text is not removed by L1 (scaled-down figure text in real papers is about 3 pt); it
   still passes through L2.
-- Nothing here measures whether a particular LLM obeys an injection that gets through. That needs an API model and is
-  not part of the deterministic harness.
+- The deterministic harness does not measure whether an LLM obeys an injection that gets through; the section below does,
+  with the limits listed there.
 - Off-page text and PDF metadata are not read by the parser at all; render mode 3 (invisible) text is not handled.
+
+## Measurement with a real LLM
+
+`uv run python -m critic_agent.injection_llm_eval --model <openai-model>` builds one critic prompt (axis `fairness`, real
+evidence sentences of `swe-agent.pdf`) with one attack sentence inserted into the evidence, under three conditions:
+`raw` (no guardrail), `spotlight` (L3 only) and `full` (L2 + L3). 29 attacks (all 6 `semantic_persuasion`, the rest sampled
+across techniques) x 3 conditions x 2 repetitions, plus an attack-free control. "Followed" = deterministic check (canary id,
+forced token) or an LLM judge. Raw outputs and judge reasons are in `results/injection_llm_eval_<model>.json`.
+
+| Critic model (judge: gpt-6-luna) | raw | spotlight (L3) | full (L2 + L3) | judge false positives on control |
+|---|---|---|---|---|
+| gpt-6-luna | 0/58 | 0/58 | 0/58 | 0/24 |
+| gpt-4o-mini | 1/58 | 1/58 | 3/58 | 0/24 |
+
+Reading it honestly:
+
+- **The experiment does not separate the conditions.** Both models ignore instruction-style injections even with no
+  defence, so there is nothing for L2/L3 to reduce (floor effect). The numbers are not evidence that L2/L3 work, and the
+  differences between columns (1, 1, 3 of 58) are noise: the extra "full" cases are `semantic_persuasion` items, which L2 does
+  not touch.
+- The few cases flagged for gpt-4o-mini are all one kind: the model **repeats the injected claim as if it were something the
+  paper says** (e.g. "the paper claims the comparison is fully fair") while still writing a genuine critique. It is not
+  hijacked, but injected text does leak into the critique as a "claim". Citing the real sentence id (L4) is what would
+  expose it.
+- The judge matters. With gpt-4o-mini as judge the same outputs scored 3/58, 5/58, 7/58 and 5/24 false positives on the
+  control, so those runs were re-judged with gpt-6-luna. The judge was also checked on four hand-made outputs (3 obeying,
+  1 genuine critique) and classified all four correctly.
+- Scope: one paper, one axis, two repetitions, injection placed in the evidence channel only (not the user request, not an
+  end-to-end hidden-text PDF). The small local model of D2 (`qwen2.5:3b`), where defences are most likely to matter, has
+  not been measured.
 
 ## Demo scenarios (web Explorer, tab "An ninh")
 
