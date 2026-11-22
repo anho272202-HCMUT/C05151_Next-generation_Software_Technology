@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Critic-Agent Explorer</title>
   <meta name="description" content="Demo trực quan hệ thống multi-agent Critic-Agent phản biện bài báo khoa học (CO5151, HCMUT).">
-  <link rel="stylesheet" href="assets/style.css?v=4">
+  <link rel="stylesheet" href="assets/style.css?v=8">
 </head>
 <body>
 <header class="topbar">
@@ -181,18 +181,24 @@ uv run critic-agent serve                          # mở http://localhost:8000 
         <tr><td>Bộ nhớ dài hạn (lessons)</td><td>“Bài học” giả khiến lượt sau chấm dễ dãi</td><td>L2 (khi ghi và khi đọc) · L3</td></tr>
       </tbody>
     </table></div>
-    <h3>4 lớp phòng thủ</h3>
-    <div class="cards four">
+    <h3>Các lớp phòng thủ (L1–L4 luôn bật, L5 tuỳ chọn)</h3>
+    <div class="cards five">
       <div class="card"><b>L1 · Parser PDF</b><p>Bỏ khối chữ mà người đọc không thấy: độ tương phản &lt; 1,5 so với nền thực tế, cỡ chữ &lt; 2,5pt, bị hình đặc vẽ đè, trong suốt. <code>pdf_parser.py</code></p></div>
       <div class="card"><b>L2 · Sanitizer</b><p>Chuẩn hoá (NFKC, homoglyph, ký tự vô hình, chữ cách quãng, leetspeak, base64) rồi che câu khớp quy tắc. Quy tắc “có cổng mệnh lệnh”: động từ phải mở câu/mệnh đề, nên câu mô tả bình thường không bị che. <code>guardrail.py</code></p></div>
       <div class="card"><b>L3 · Spotlighting</b><p>Nội dung ngoài nằm trong thẻ <code>&lt;untrusted&gt;</code> kèm quy tắc ưu tiên của system prompt. Chưa đo được tác dụng nếu không có model thật. <code>prompts.py</code></p></div>
       <div class="card"><b>L4 · Kiểm chứng và phân quyền</b><p>Trích dẫn phải có thật trong PDF, Evaluator kiểm tất định, tool đi qua gateway có allow-list và HMAC. <code>agents.py</code>, <code>gateway.py</code></p></div>
+      <div class="card"><b>L5 · Quy tắc nhận thức <span class="muted">(tuỳ chọn)</span></b><p>Lời tự khẳng định của tác giả là <i>tuyên bố cần kiểm chứng</i>, không phải bằng chứng; hạn chế do tác giả tự nêu không phải phát hiện độc lập. Nhắm vào tấn công ngữ nghĩa. Mặc định tắt: chưa chứng minh được hiệu quả. <code>prompts.py</code></p></div>
     </div>
     <h3>Kết quả đo trên bộ mẫu tấn công</h3>
     <p class="muted">Một tấn công bị vô hiệu khi <i>marker</i> (phần cốt lõi của chỉ thị độc hại) không còn tới được LLM. Tập <b>heldout</b> được viết trước khi chỉnh phòng thủ để phát hiện việc “học vẹt” theo ví dụ của chính mình.
       Chạy lại: <code>uv run python -m critic_agent.injection_eval</code>.</p>
     <div id="inj-cards" class="cards four"></div>
     <div id="inj-table"></div>
+    <h3>Thử nghiệm với model thật: toàn bộ pipeline và tấn công ngữ nghĩa</h3>
+    <p class="muted">Dữ liệu tính lại từ từng lượt chạy trong <code>results/</code> (<code>scripts/export_injection_studies.py</code>). Chi tiết, hạn chế và chi phí:
+      <code>docs/injection_e2e_study.md</code>, <code>docs/injection_semantic_study.md</code>.</p>
+    <div id="studies-e2e"></div>
+    <div id="studies-semantic"></div>
     <h3>Thử guardrail</h3>
     <p class="muted">Chọn một mẫu tấn công hoặc tự dán văn bản. Khi chạy bằng <code>critic-agent serve</code>, văn bản được xử lý bởi đúng hàm Python <code>sanitize()</code>. Trên GitHub Pages chỉ xem lại kết quả đã ghi của các mẫu có sẵn.</p>
     <div class="guard-controls">
@@ -205,6 +211,8 @@ uv run critic-agent serve                          # mở http://localhost:8000 
     <ul class="muted">
       <li>Câu thuyết phục không có mệnh lệnh và không gọi tên AI (nhóm <code>semantic_persuasion</code>) vượt qua bộ lọc rule-based: bộ đo hiện là 0/6. Chỉ L3 và L4 có thể hạn chế, và cần model thật để đo.</li>
       <li>Chữ 2,5–4pt không bị parser xoá (cỡ này trùng với chữ trong hình thu nhỏ của bài báo thật); nó vẫn đi qua L2.</li>
+      <li><b>Tấn công decoy</b> (gài một hạn chế vô hại do chính tác giả thừa nhận) làm Critic bỏ điểm yếu thật: tỉ lệ giữ điểm yếu thật giảm từ 40% xuống 18% trên gpt-4o-mini; bộ lọc không chặn được vì câu hiển thị, đúng ngữ pháp và không có mệnh lệnh. L5 chỉ giảm phần nào và chưa có ý nghĩa thống kê.</li>
+      <li>Toàn bộ tấn công và bộ lọc do cùng một trợ lý AI viết; thử nhờ model họ khác viết lô tấn công độc lập thì bị từ chối (xem <code>docs/threat_model.md</code>), nên tính độc lập của đánh giá vẫn là hạn chế mở.</li>
       <li>Quy tắc tiếng Anh/Việt/Pháp/Tây Ban Nha/Đức/Trung/Nhật; ngôn ngữ khác chưa được phủ.</li>
       <li>Phần quyền của tool (HMAC, sandbox) nằm ngoài phạm vi chống prompt injection ở trang này; xem bảng phân quyền phía trên.</li>
     </ul>
@@ -216,7 +224,7 @@ uv run critic-agent serve                          # mở http://localhost:8000 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="assets/architecture.js?v=4"></script>
-<script src="assets/app.js?v=4"></script>
+<script src="assets/architecture.js?v=8"></script>
+<script src="assets/app.js?v=8"></script>
 </body>
 </html>

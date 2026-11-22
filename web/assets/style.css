@@ -48,6 +48,7 @@ footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 20
 .btn:disabled { opacity: .5; cursor: wait; }
 
 .cards { display: grid; gap: 12px; } .cards.five { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.cards.five { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .cards.four { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .cards.three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } .cards.two { grid-template-columns: 1fr 1fr; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }

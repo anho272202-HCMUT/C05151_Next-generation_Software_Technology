@@ -100,3 +100,18 @@ def test_decoy_measurement_and_fisher():
     row = measure(final, "reflexion.pdf", payload)
     assert row["decoy_adopted"] is True and row["retained"]["fairness"] is False
     assert fisher(0, 5, 5, 0) < 0.01 and fisher(2, 3, 2, 3) == 1.0
+
+
+def test_web_study_export_matches_raw_rows(tmp_path):
+    import importlib.util
+    import json
+
+    spec = importlib.util.spec_from_file_location("export_studies", Path(__file__).resolve().parents[1] / "scripts" / "export_injection_studies.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    e2e, sem = mod.e2e(), mod.semantic()
+    assert sum(r["imperative"][1] for r in e2e) == 184 and all(r["imperative"][0] == 0 for r in e2e)
+    assert all(r["hidden_cited_l1"][0] == 0 for r in e2e)
+    assert sem["configs"]["none"]["decoy_adopted"] == [23, 60] and sem["configs"]["system+L5"]["decoy_adopted"] == [15, 60]
+    assert 0.01 < sem["p"]["attack_vs_clean_no_defence"] < 0.02
+    assert json.loads((Path(__file__).resolve().parents[1] / "web" / "data" / "injection_studies.json").read_text())["e2e"]

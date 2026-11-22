@@ -123,6 +123,18 @@ the adversarial critic (0/20 adopted), but a *decoy limitation* (a harmless admi
 adoption from 38% to 25% and raises the real weakness kept to 30%, but the effect is not significant (p = 0.17 / 0.20) and uneven across
 axes, so it is reported as promising, not established.
 
+## Who wrote the attacks (independence of the evaluation)
+
+Be explicit about this when presenting: **the same LLM assistant (Claude Sonnet 5.5) wrote the sanitiser, the 84-attack set, the end-to-end payloads
+and the semantic payloads.** The dev/heldout split, frozen payloads and fresh test seeds limit over-fitting, but they do not make the attacker
+independent of the defender: the author of the rules knows which sentences they catch. The reference labels of the weaknesses
+(`eval/labels.json`) were also drafted by an LLM and not yet reviewed by a human (D2 plans a review).
+
+Why the assistant did not simply write the "independent" attacks: independence needs an author that never saw the rules; and an adaptive attacker
+needs an automated loop that a script can call. An attempt with gpt-6-luna as adaptive attacker was refused for several goals; the refusal was not
+circumvented, a weaker model (gpt-4o-mini) was used, and the adaptive result is therefore inconclusive. The attempted mitigation, a blind batch written by a
+model of another family that never saw the filter (Claude Haiku 5.5), was also refused: see `docs/injection_blind_study.md`.
+
 ## Demo scenarios (web Explorer, tab "An ninh")
 
 1. Pick `ob-01` (Cyrillic homoglyphs): the page calls the real `sanitize()`; the sentence is redacted with rule `override`.

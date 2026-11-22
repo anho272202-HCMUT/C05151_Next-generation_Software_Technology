@@ -417,6 +417,7 @@
       ${tools.map(t => `<tr><td><code>${t.name}</code></td><td><span class="lvl lvl-${t.level}">${LEVEL_VI[t.level]}</span></td><td>${t.agents.join(", ")}</td>
       <td>${t.needs_approval ? "bắt buộc + HMAC" : "—"}</td><td>${esc(t.description)}</td></tr>`).join("")}</tbody></table></div>`;
     renderInjection();
+    renderStudies();
   }
 
   const TECH_VI = {direct_override: "Ghi đè chỉ thị", paraphrased_override: "Ghi đè diễn đạt lại", role_hijack: "Chiếm vai trò", fake_template: "Giả template/thẻ",
@@ -444,6 +445,26 @@
       ${techs.map(t => row(TECH_VI[t] || t, t, t === "semantic_persuasion")).join("")}
       ${row("<b>Tổng</b>", "all")}</tbody></table></div>`;
     setupPlayground(d);
+  }
+
+  function renderStudies() {
+    const d = data.studies;
+    if (!d) { $("#studies-e2e").innerHTML = ""; return; }
+    const f = x => `${x[0]}/${x[1]}`;
+    $("#studies-e2e").innerHTML = `<div class="panel-title">Pipeline đầy đủ trên PDF bị chèn payload (432 lượt, 4 bài báo)</div><div class="table-wrap"><table>
+      <thead><tr><th>Model</th><th>Lượt chạy</th><th>Tấn công dạng mệnh lệnh thành công</th><th>…khi không phòng thủ</th><th>Chữ ẩn bị trích làm bằng chứng: không L1</th><th>…có L1</th></tr></thead><tbody>
+      ${d.e2e.map(r => `<tr><td><code>${r.model}</code></td><td class="num">${r.runs}</td><td class="num">${f(r.imperative)}</td><td class="num">${f(r.imperative_no_defence)}</td>
+        <td class="num bad">${f(r.hidden_cited_no_defence)}</td><td class="num good">${f(r.hidden_cited_l1)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted small">Model hiện đại tự chống được tấn công mệnh lệnh (không có gì để phòng thủ giảm thêm); L1 loại hẳn việc trích chữ người đọc không thấy.</p>`;
+    const s = d.semantic;
+    if (!s) { $("#studies-semantic").innerHTML = ""; return; }
+    const names = {none: "Không phòng thủ", system: "L1 + L2 + L3", "system+L5": "L1 + L2 + L3 + L5"};
+    const pc = x => Math.round(100 * x[0] / x[1]) + "%";
+    $("#studies-semantic").innerHTML = `<div class="panel-title">Tấn công decoy (gài một “hạn chế” vô hại do chính tác giả thừa nhận) · ${s.model}</div><div class="table-wrap"><table>
+      <thead><tr><th>Cấu hình</th><th>Critic nêu decoy</th><th>Điểm yếu thật còn được giữ (bị tấn công)</th><th>…(lượt sạch)</th></tr></thead><tbody>
+      ${Object.entries(s.configs).map(([k, v]) => `<tr><td>${names[k]}</td><td class="num">${f(v.decoy_adopted)} (${pc(v.decoy_adopted)})</td><td class="num">${f(v.real_kept_attacked)} (${pc(v.real_kept_attacked)})</td><td class="num">${f(v.real_kept_clean)} (${pc(v.real_kept_clean)})</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted small">Decoy làm tỉ lệ giữ điểm yếu thật giảm từ ${pc(s.configs.none.real_kept_clean)} xuống ${pc(s.configs.none.real_kept_attacked)} (Fisher p = ${s.p.attack_vs_clean_no_defence}); L1–L3 không chặn được.
+      L5 giảm decoy ${pc(s.configs.none.decoy_adopted)} → ${pc(s.configs["system+L5"].decoy_adopted)} nhưng chưa có ý nghĩa thống kê (p = ${s.p.l5_vs_none_decoy}). 2 bài báo, một model, nhãn do AI soạn.</p>`;
   }
 
   function setupPlayground(d) {
@@ -476,8 +497,8 @@
 
   // ------------------------------------------------------------------ boot
   (async function boot() {
-    [data.system, data.index, data.graph, data.summary, data.agreement, data.injection] = await Promise.all(
-      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json", "data/injection_eval.json"].map(getJSON));
+    [data.system, data.index, data.graph, data.summary, data.agreement, data.injection, data.studies] = await Promise.all(
+      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json", "data/injection_eval.json", "data/injection_studies.json"].map(getJSON));
     renderOverview();
     renderArchitecture();
     setupPlayer();

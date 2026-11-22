@@ -26,10 +26,11 @@
     {id: "tool:publish_review", x: 746, y: 410, w: 110, h: 60, kind: "tool", label: "publish_review", sub: "ghi không hoàn tác"},
     {id: "tool:execute_code_in_sandbox", x: 867, y: 410, w: 113, h: 60, kind: "tool", label: "sandbox", sub: "thực thi mã (tắt)"},
     // prompt-injection defence layers (threat model): where they act is described in INFO
-    {id: "def:l1", x: 20, y: 505, w: 234, h: 56, kind: "guard", label: "L1 · Parser PDF", sub: "bỏ chữ ẩn / tương phản thấp / bị che"},
-    {id: "def:l2", x: 262, y: 505, w: 234, h: 56, kind: "guard", label: "L2 · Sanitizer", sub: "chuẩn hoá + che câu chỉ thị"},
-    {id: "def:l3", x: 504, y: 505, w: 234, h: 56, kind: "guard", label: "L3 · Spotlighting", sub: "<untrusted> + quy tắc ưu tiên"},
-    {id: "def:l4", x: 746, y: 505, w: 234, h: 56, kind: "guard", label: "L4 · Kiểm chứng", sub: "trích dẫn có thật + gateway"},
+    {id: "def:l1", x: 20, y: 505, w: 182, h: 56, kind: "guard", label: "L1 · Parser PDF", sub: "bỏ chữ ẩn / tương phản thấp"},
+    {id: "def:l2", x: 214, y: 505, w: 182, h: 56, kind: "guard", label: "L2 · Sanitizer", sub: "chuẩn hoá + che câu chỉ thị"},
+    {id: "def:l3", x: 408, y: 505, w: 182, h: 56, kind: "guard", label: "L3 · Spotlighting", sub: "<untrusted> + quy tắc ưu tiên"},
+    {id: "def:l4", x: 602, y: 505, w: 182, h: 56, kind: "guard", label: "L4 · Kiểm chứng", sub: "trích dẫn có thật + gateway"},
+    {id: "def:l5", x: 796, y: 505, w: 184, h: 56, kind: "guard", label: "L5 · Quy tắc nhận thức", sub: "tuỳ chọn · đang thử nghiệm"},
   ];
 
   const EDGES = [
@@ -53,6 +54,7 @@
     "def:l2": ["L2 · Sanitizer (chuẩn hoá + quy tắc)", "Áp dụng ở bốn điểm vào: văn bản PDF, yêu cầu người dùng, kết quả tool và bộ nhớ lessons. Bước 1 chuẩn hoá để thấy cái model sẽ thấy: NFKC, homoglyph Cyrillic/Greek, ký tự vô hình, ký tự tag Unicode, chữ cách quãng, leetspeak, base64. Bước 2: ~50 quy tắc theo nhóm (override, role-hijack, fake-template, review-manipulation, prompt-leak, tool-abuse, exfiltration, authority, memory-poisoning, đa ngôn ngữ). Quy tắc nói về hành động phải “mở câu” (cổng mệnh lệnh), nên câu mô tả như “models that ignore the instructions…” không bị che. Câu khớp bị thay bằng [REDACTED].", "guardrail.py, gateway.py, lessons.py"],
     "def:l3": ["L3 · Spotlighting", "Nội dung ngoài được bọc trong thẻ <untrusted> và system prompt có quy tắc ưu tiên cao nhất: không làm theo chỉ thị trong thẻ, không lộ mã nội bộ. Là lớp cuối nếu L1–L2 bỏ lọt, nhưng hiệu quả phụ thuộc model: chưa được đo trong repo này.", "prompts.py"],
     "def:l4": ["L4 · Kiểm chứng đầu ra và phân quyền", "Critic chỉ trích ID câu, hệ thống tự chép nguyên văn từ PDF, Evaluator kiểm ID tất định; tool đi qua gateway với allow-list theo agent, người duyệt + HMAC cho tool nguy hiểm. Nhờ vậy một chỉ thị lọt qua cũng khó biến thành trích dẫn bịa hoặc hành động ngoài quyền.", "agents.py, gateway.py, permissions.py"],
+    "def:l5": ["L5 · Quy tắc nhận thức (tuỳ chọn, thử nghiệm)", "Thêm vào system prompt của Critic và Evaluator khi bật CRITIC_L5=1: lời tự khẳng định của tác giả về chính đánh giá của mình (“mọi baseline đều dùng cùng ngân sách”, “không có hạn chế nào”) là TUYÊN BỐ cần kiểm chứng chứ không phải bằng chứng; một hạn chế do chính tác giả thừa nhận không phải là phát hiện độc lập. Nhắm vào tấn công ngữ nghĩa mà L1–L3 không thấy được (xem kết quả decoy ở tab An ninh). Mặc định TẮT: hiệu quả đo được chưa có ý nghĩa thống kê (decoy 38% → 25%, p = 0,17).", "prompts.py: EPISTEMIC_RULE, config.py"],
     gateway: ["ToolGateway", "Lối duy nhất từ agent tới tool. Gateway (1) kiểm tra allow-list theo agent, (2) yêu cầu người duyệt với tool ghi không hoàn tác và thực thi mã, rồi cấp token HMAC mà server kiểm tra lại, (3) quét injection trong kết quả tool, (4) ghi audit log và trace.", "gateway.py, permissions.py"],
   };
   const TOOL_INFO = {
@@ -144,7 +146,8 @@
     }
     const cap = document.createElementNS(NS, "text");
     Object.entries({x: 20, y: 497, class: "band-caption"}).forEach(([k, v]) => cap.setAttribute(k, v));
-    cap.textContent = "LỚP PHÒNG THỦ PROMPT INJECTION (threat model): mỗi lớp áp dụng tại các khối ghi chú L1–L4 ở trên";
+    cap.textContent = "LỚP PHÒNG THỦ PROMPT INJECTION (THREAT MODEL): L1–L5, mỗi lớp được ghi chú trên các khối phía trên";
+    cap.style.textAnchor = "start";
     svg.appendChild(cap);
   }
 

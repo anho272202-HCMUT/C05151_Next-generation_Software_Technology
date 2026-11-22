@@ -72,7 +72,7 @@ class AnthropicLLM:
         start = time.perf_counter()
         resp = await self._client.messages.create(
             model=self.model, system=system + "\nRespond with one JSON object only.", max_tokens=max_tokens,
-            temperature=self._temperature, messages=[{"role": "user", "content": user}])
+            messages=[{"role": "user", "content": user}])  # recent models take no sampling parameters
         latency = time.perf_counter() - start
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         self._tracker.record(agent, self.model, resp.usage.input_tokens, resp.usage.output_tokens, latency)
