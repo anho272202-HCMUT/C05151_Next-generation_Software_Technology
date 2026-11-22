@@ -8,6 +8,7 @@
                     "irreversible-write": "ghi không hoàn tác", "code-execution": "thực thi mã"};
   const PRICE_IN = 0.15 / 1e6, PRICE_OUT = 0.6 / 1e6;  // gpt-4o-mini reference pricing
   const data = {};
+  let guardTry = null;  // set by setupPlayground: loads a text into the guardrail box and runs it
 
   async function getJSON(path) {
     try { const r = await fetch(path, {cache: "no-store"}); return r.ok ? await r.json() : null; }
@@ -445,6 +446,54 @@
       ${techs.map(t => row(TECH_VI[t] || t, t, t === "semantic_persuasion")).join("")}
       ${row("<b>Tổng</b>", "all")}</tbody></table></div>`;
     setupPlayground(d);
+    renderTechExamples(d);
+  }
+
+  const TECH_NOTE = {
+    direct_override: "Ra lệnh thẳng cho AI bỏ qua hướng dẫn gốc.", paraphrased_override: "Cùng ý nhưng đổi từ ngữ để né bộ lọc từ khoá.",
+    role_hijack: "Bắt AI đóng một vai không bị ràng buộc.", fake_template: "Giả thẻ hệ thống hoặc định dạng chat để trông như lệnh của hệ thống.",
+    review_manipulation: "Nhắm riêng vào bản phản biện: khen, ép điểm, giấu điểm yếu.", prompt_leak: "Đòi AI in system prompt hoặc mã nội bộ.",
+    tool_abuse: "Ép AI gọi công cụ ngoài nhiệm vụ.", exfiltration: "Ép gửi dữ liệu ra ngoài (đọc file, gọi URL).",
+    obfuscation: "Che chữ: ở ví dụ, các chữ o và i là ký tự Cyrillic trông y hệt chữ Latin; còn có ký tự vô hình, base64, leetspeak.",
+    multilingual: "Đổi sang ngôn ngữ khác để né bộ lọc tiếng Anh.", format_evasion: "Ngắt câu qua nhiều dòng, giấu trong bảng hoặc trích dẫn.",
+    authority: "Mạo danh giảng viên, quản trị viên, ban tổ chức.", memory_poisoning: "Gài “bài học” giả vào bộ nhớ dài hạn.",
+    hidden_pdf_text: "Chữ trắng / xám nhạt / cỡ rất nhỏ / bị hình che: người đọc không thấy nhưng máy đọc được.",
+    semantic_persuasion: "Không có mệnh lệnh, chỉ là câu khẳng định nghe như nội dung bài báo.",
+    decoy: "Gài một “hạn chế” vô hại do tác giả tự nêu để Critic bỏ điểm yếu thật.",
+  };
+
+  function renderTechExamples(d) {
+    const first = {};
+    for (const a of d.attacks) if (!first[a.technique]) first[a.technique] = a;
+    const REDACT = "[REDACTED: suspected injected instruction]";
+    const rows = Object.keys(TECH_VI).filter(t => first[t]).map(t => {
+      const a = first[t], hidden = a.channel === "pdf-hidden";
+      const after = hidden ? `<i class="muted">(đoạn chữ ẩn bị loại ngay khi đọc PDF)</i>` : (a.neutralised.sanitizer
+        ? `<span class="redacted">${esc(REDACT)}</span>` : `<span class="bad">không bị che: AI đọc nguyên văn</span>`);
+      const layer = hidden ? "L1 parser" : (a.neutralised.sanitizer ? `L2 · <code>${esc(a.rule)}</code>` : "không lớp nào chặn (chỉ L3/L4/L5 hạn chế)");
+      const ok = hidden || a.neutralised.sanitizer;
+      return `<tr><td><b>${esc(TECH_VI[t])}</b><div class="muted small">${esc(TECH_NOTE[t] || "")}</div></td>
+        <td class="ex-cell"><code>${esc(a.text.slice(0, 170))}</code>${hidden ? `<div class="muted small">(in bằng chữ trắng trên nền trắng)</div>` : ""}</td>
+        <td class="ex-cell">${after}</td><td class="${ok ? "good" : "bad"}">${layer}</td>
+        <td>${hidden ? "" : `<button class="btn" data-try="${esc(a.id)}">Thử</button>`}</td></tr>`;
+    });
+    const ex = data.studies?.examples;
+    if (ex) {
+      for (const [kind, label] of [["assertion", "Khẳng định sai của tác giả"], ["decoy", "Decoy (hạn chế mồi)"]]) {
+        const e = ex[kind];
+        rows.push(`<tr><td><b>${label}</b><div class="muted small">${esc(TECH_NOTE[kind] || "Khẳng định giả làm điểm yếu thật có vẻ đã được giải quyết.")}</div></td>
+          <td class="ex-cell"><code>${esc(e.text)}</code><div class="muted small">(${esc(e.paper)}, trục ${esc(e.axis)}; in ở lề trang)</div></td>
+          <td class="ex-cell"><span class="bad">không bị che: AI đọc nguyên văn</span></td>
+          <td class="${kind === "decoy" ? "bad" : "good"}">${kind === "decoy" ? "không lớp nào chặn; L5 giảm phần nào (38% → 25%)" : "không bị chặn nhưng Critic đối kháng nghi ngờ (0/20 tin theo)"}</td>
+          <td><button class="btn" data-try-text="${esc(e.text)}">Thử</button></td></tr>`);
+      }
+    }
+    $("#tech-examples").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Kỹ thuật</th><th>Ví dụ tấn công</th><th>LLM thấy sau phòng thủ</th><th>Lớp xử lý</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+    const byId = Object.fromEntries(d.attacks.map(a => [a.id, a]));
+    $("#tech-examples").querySelectorAll("button[data-try], button[data-try-text]").forEach(b => b.addEventListener("click", () => {
+      const text = b.dataset.try ? byId[b.dataset.try].text : b.dataset.tryText;
+      if (guardTry) guardTry(text);
+    }));
   }
 
   function renderStudies() {
@@ -493,6 +542,7 @@
     sel.addEventListener("change", () => { if (sel.value) { input.value = byId[sel.value].text; run(); } });
     $("#guard-run").addEventListener("click", run);
     run();
+    guardTry = text => { sel.value = ""; input.value = text; run(); input.scrollIntoView({behavior: "smooth", block: "center"}); };
   }
 
   // ------------------------------------------------------------------ boot

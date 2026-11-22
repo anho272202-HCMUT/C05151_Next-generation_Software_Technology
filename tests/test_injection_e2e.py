@@ -114,4 +114,9 @@ def test_web_study_export_matches_raw_rows(tmp_path):
     assert all(r["hidden_cited_l1"][0] == 0 for r in e2e)
     assert sem["configs"]["none"]["decoy_adopted"] == [23, 60] and sem["configs"]["system+L5"]["decoy_adopted"] == [15, 60]
     assert 0.01 < sem["p"]["attack_vs_clean_no_defence"] < 0.02
-    assert json.loads((Path(__file__).resolve().parents[1] / "web" / "data" / "injection_studies.json").read_text())["e2e"]
+    web = json.loads((Path(__file__).resolve().parents[1] / "web" / "data" / "injection_studies.json").read_text())
+    assert web["e2e"] and {"decoy", "assertion"} <= set(web["examples"])
+    # the web examples table relies on per-attack rule and sanitised text being exported by injection_eval
+    ev = json.loads((Path(__file__).resolve().parents[1] / "web" / "data" / "injection_eval.json").read_text())
+    text_rows = [a for a in ev["attacks"] if a["channel"] == "text" and a["neutralised"]["sanitizer"]]
+    assert text_rows and all(a["rule"] and "REDACTED" in a["after"] for a in text_rows)

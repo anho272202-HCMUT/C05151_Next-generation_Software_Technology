@@ -99,6 +99,9 @@ def evaluate_attacks(attacks: list[dict]) -> dict:
                    "text": atk["text"][:200], "neutralised": {}}
             if atk["channel"] == "pdf-hidden":
                 row["hide"] = atk["hide"]
+            else:  # what the sanitiser does with it, for the web examples
+                clean, flags = sanitize(atk["text"], "text")
+                row["rule"], row["after"] = (flags[0].rule if flags else None), clean[:200]
             for layer in LAYERS:
                 done = not reaches_llm(atk, layer, Path(tmp))
                 row["neutralised"][layer] = done

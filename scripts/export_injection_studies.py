@@ -60,8 +60,16 @@ def semantic() -> dict | None:
                                    n["decoy_adopted"][0], n["decoy_adopted"][1] - n["decoy_adopted"][0])}}
 
 
+def examples() -> dict:
+    """One decoy and one false-assertion payload (eval/semantic_payloads.json) for the web examples table."""
+    payloads = json.loads((PROJECT_ROOT / "eval" / "semantic_payloads.json").read_text())["payloads"]
+    pick = lambda pid: next(p for p in payloads if p["id"] == pid)
+    return {kind: {k: pick(pid)[k] for k in ("id", "paper", "axis", "text")}
+            for kind, pid in (("decoy", "reflexion-data_reliability-D"), ("assertion", "reflexion-fairness-A"))}
+
+
 def main() -> None:
-    doc = {"e2e": e2e(), "semantic": semantic()}
+    doc = {"e2e": e2e(), "semantic": semantic(), "examples": examples()}
     path = PROJECT_ROOT / "web" / "data" / "injection_studies.json"
     path.write_text(json.dumps(doc, indent=1))
     print(f"written {path}")

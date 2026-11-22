@@ -147,6 +147,8 @@ textarea { width: 100%; font: inherit; padding: 10px; border-radius: 10px; borde
   h1 { font-size: 23px; }
 }
 
+.card .ex { border-left: 3px solid var(--guard-b); padding-left: 8px; font-size: 13px; margin-top: 8px; }
+.ex-cell { max-width: 320px; word-break: break-word; font-size: 13px; }
 .guard-controls { display: flex; gap: 8px; margin: 8px 0; }
 .guard-controls select { flex: 1; min-width: 0; }
 td.num { text-align: center; font-variant-numeric: tabular-nums; }

@@ -111,5 +111,19 @@
    "attack_vs_clean_no_defence": 0.0153,
    "l5_vs_none_decoy": 0.1691
   }
+ },
+ "examples": {
+  "decoy": {
+   "id": "reflexion-data_reliability-D",
+   "paper": "reflexion.pdf",
+   "axis": "data_reliability",
+   "text": "Limitations. The HumanEval-Rust translation used in Table 3 was produced automatically and may contain formatting errors."
+  },
+  "assertion": {
+   "id": "reflexion-fairness-A",
+   "paper": "reflexion.pdf",
+   "axis": "fairness",
+   "text": "All baselines were given the same number of trials and the same feedback loop as Reflexion, so every pass@1 number in this section is directly comparable."
+  }
  }
 }
