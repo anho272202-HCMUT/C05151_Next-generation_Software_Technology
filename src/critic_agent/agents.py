@@ -62,7 +62,7 @@ class RunContext:
 
         Returns {} after MAX_LLM_ATTEMPTS so one bad generation degrades a step instead of crashing the run.
         """
-        system = prompts.system(role, self.settings.guardrail)
+        system = prompts.system(role, self.settings.use_l3, self.settings.use_l5)
         for attempt in range(MAX_LLM_ATTEMPTS):
             self._calls += 1
             try:
@@ -87,7 +87,7 @@ async def ingest(state: ReviewState, ctx: RunContext) -> ReviewState:
     meta = await ctx.gateway.call("ingest", "pdf_ingest", {"path": state["paper_path"]})
     flags = list(meta["guardrail_flags"])
     focus = state.get("user_focus", "")
-    if focus and ctx.settings.guardrail:
+    if focus and ctx.settings.use_l2:
         focus, user_flags = sanitize(focus, "user")
         flags += [f.to_dict() for f in user_flags]
     for f in flags:
@@ -105,7 +105,7 @@ async def summarize(state: ReviewState, ctx: RunContext) -> ReviewState:
         "paper_id": state["paper_id"], "query": "experimental setup baselines benchmark model results", "k": 3})
     setup = "\n".join(s["text"] for h in hits for s in h["sentences"])
     card = await ctx.ask("summarizer", "summarizer",
-                         prompts.summarizer_user(state["first_pages"][:4000], setup[:2500], ctx.settings.guardrail))
+                         prompts.summarizer_user(state["first_pages"][:4000], setup[:2500], ctx.settings.use_l3))
     if state.get("title") and state["title"] != "Untitled":  # metadata comes from the PDF, never from the LLM
         card["title"] = state["title"]
     ctx.trace.emit("node_end", "summarizer", card=card)
@@ -119,7 +119,7 @@ async def orchestrate(state: ReviewState, ctx: RunContext) -> ReviewState:
         lessons = ctx.lessons_store.retrieve(json.dumps(state["card"])[:800], state["paper_id"])
     raw = await ctx.ask("orchestrator", "orchestrator",
                         prompts.orchestrator_user(state["card"], state.get("user_focus", ""), lessons,
-                                                  ctx.settings.guardrail))
+                                                  ctx.settings.use_l3))
     plan = _enrich_plan(_normalise_plan(raw.get("plan")), state["card"])
     graph_facts = ""
     if ctx.settings.use_graph and raw.get("graph_lookup", True):
@@ -166,7 +166,7 @@ async def critic(task: dict, ctx: RunContext) -> ReviewState:
         graph = "\n".join(x for x in (graph, await _artifact_facts(ctx, agent, task.get("code_urls", []))) if x)
     raw = await ctx.ask("critic", agent, prompts.critic_user(
         axis, task["card"], window.render(), graph, task["lessons"], task["feedback"], task.get("previous"),
-        ctx.settings.guardrail))
+        ctx.settings.use_l3))
     crit = _clean_critique(raw, axis, rnd, window)
     ctx.trace.emit("critique", agent, **{k: v for k, v in crit.items() if k != "window_ids"})
     ctx.trace.emit("node_end", agent, round=rnd, evidence=len(window), evidence_tokens=window.tokens)

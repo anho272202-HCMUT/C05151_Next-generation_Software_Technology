@@ -70,6 +70,8 @@ class ToolGateway:
         env = {
             "CRITIC_APPROVAL_SECRET": self._secret,
             "CRITIC_GUARDRAIL": "1" if s.guardrail else "0",
+            "CRITIC_L1": "1" if s.use_l1 else "0", "CRITIC_L2": "1" if s.use_l2 else "0",
+            "CRITIC_L3": "1" if s.use_l3 else "0",
             "CRITIC_RETRIEVAL": s.retrieval,
             "CRITIC_ALLOW_CODE": "1" if s.allow_code_execution else "0",
             "LLM_PROVIDER": s.llm_provider,
@@ -109,7 +111,7 @@ class ToolGateway:
                          latency_s=latency, args=_preview(args))
         if result.is_error:
             raise ToolError(text[:500])
-        if self._settings.guardrail and tool != "pdf_ingest":  # ingest already sanitised server-side
+        if self._settings.use_l2 and tool != "pdf_ingest":  # ingest already sanitised server-side
             text = self._scan_output(tool, text)
         return json.loads(text)
 

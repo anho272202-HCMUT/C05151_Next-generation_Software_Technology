@@ -8,6 +8,7 @@
                     "irreversible-write": "ghi không hoàn tác", "code-execution": "thực thi mã"};
   const PRICE_IN = 0.15 / 1e6, PRICE_OUT = 0.6 / 1e6;  // gpt-4o-mini reference pricing
   const data = {};
+  let guardTry = null;  // set by setupPlayground: loads a text into the guardrail box and runs it
 
   async function getJSON(path) {
     try { const r = await fetch(path, {cache: "no-store"}); return r.ok ? await r.json() : null; }
@@ -124,7 +125,7 @@
       case "llm_error": return `<b>${esc(ag)}</b>: lời gọi LLM lỗi (${esc(e.error)}). Hệ thống tự thử lại với seed khác.`;
       case "tool_call": return `<b>${esc(ag)}</b> gọi MCP tool <code>${esc(e.tool)}</code> <span class="lvl lvl-${e.level}">${LEVEL_VI[e.level] || e.level}</span> → gateway: <b>${esc(e.decision)}</b> (${e.latency_s}s).`;
       case "tool_denied": return `<b>Gateway CHẶN</b> <code>${esc(e.tool)}</code> mà ${esc(ag)} yêu cầu: ${e.reason === "least-privilege" ? "agent này không có quyền" : "không có người duyệt"}.`;
-      case "guardrail_flag": return `<b>Guardrail</b> đã vô hiệu hoá nội dung nghi là chỉ thị (nguồn: ${esc(e.source)}, trang ${e.page ?? "-"}): “${esc(e.snippet)}”`;
+      case "guardrail_flag": return `<b>Guardrail</b> đã vô hiệu hoá nội dung nghi là chỉ thị (nguồn: ${esc(e.source)}, trang ${e.page ?? "-"}${e.rule ? ", quy tắc " + esc(e.rule) : ""}): “${esc(e.snippet)}”`;
       case "critique": return e.no_issue ? `Critic ${esc(Arch.AXIS_LABEL[e.axis])}: không tìm thấy vấn đề.` :
         `Critic <b>${esc(Arch.AXIS_LABEL[e.axis])}</b> đề xuất: “${esc(e.weakness)}” · trích dẫn <code>${(e.evidence_ids || []).join(", ") || "—"}</code>` +
         (e.fabricated_ids?.length ? ` · <span class="bad">ID không có trong bằng chứng: ${e.fabricated_ids.join(", ")}</span>` : "");
@@ -416,22 +417,138 @@
     $("#tools-table").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Mức quyền</th><th>Agent được gọi</th><th>Người duyệt</th><th>Mô tả / cơ chế chặn</th></tr></thead><tbody>
       ${tools.map(t => `<tr><td><code>${t.name}</code></td><td><span class="lvl lvl-${t.level}">${LEVEL_VI[t.level]}</span></td><td>${t.agents.join(", ")}</td>
       <td>${t.needs_approval ? "bắt buộc + HMAC" : "—"}</td><td>${esc(t.description)}</td></tr>`).join("")}</tbody></table></div>`;
-    const patterns = (data.system?.injection_patterns || []).map(p => { try { return new RegExp(p, "i"); } catch { return null; } }).filter(Boolean);
-    const run = () => {
-      const text = $("#guard-input").value;
-      const parts = text.split(/(?<=[.!?])\s+|\n/);
-      $("#guard-output").innerHTML = parts.map(s => patterns.some(p => p.test(s)) ?
-        `<span class="redacted" title="${esc(s)}">[REDACTED: suspected injected instruction]</span>` : esc(s)).join(" ") +
-        `<p class="muted small">${parts.filter(s => patterns.some(p => p.test(s))).length} câu bị che · ${patterns.length} mẫu đang áp dụng</p>`;
+    renderInjection();
+    renderStudies();
+  }
+
+  const TECH_VI = {direct_override: "Ghi đè chỉ thị", paraphrased_override: "Ghi đè diễn đạt lại", role_hijack: "Chiếm vai trò", fake_template: "Giả template/thẻ",
+    review_manipulation: "Thao túng bản phản biện", prompt_leak: "Lộ system prompt", tool_abuse: "Lạm dụng tool", exfiltration: "Rò rỉ dữ liệu",
+    obfuscation: "Che giấu (homoglyph, mã hoá…)", multilingual: "Đa ngôn ngữ", format_evasion: "Lách định dạng", authority: "Mạo danh thẩm quyền",
+    memory_poisoning: "Đầu độc bộ nhớ", hidden_pdf_text: "Chữ ẩn trong PDF", semantic_persuasion: "Thuyết phục ngữ nghĩa (rủi ro còn lại)"};
+  const pct = r => Math.round(r * 100) + "%";
+
+  function renderInjection() {
+    const d = data.injection;
+    if (!d) { $("#inj-cards").innerHTML = `<div class="panel muted">Chưa có kết quả: chạy <code>uv run python -m critic_agent.injection_eval --export-web</code>.</div>`; return; }
+    const S = d.summary, full = S.full, before = d.before?.summary;
+    const card = (title, big, sub) => `<div class="card"><div class="muted small">${title}</div><div class="big">${big}</div><div class="muted small">${sub}</div></div>`;
+    $("#inj-cards").innerHTML = [
+      card("Vô hiệu hoá (toàn bộ)", `${full.all.neutralised}/${full.all.total}`, before ? `trước: ${before.all.neutralised}/${before.all.total} (${pct(before.all.rate)}) → sau: ${pct(full.all.rate)}` : pct(full.all.rate)),
+      card("Tập heldout", `${full["split:heldout"].neutralised}/${full["split:heldout"].total}`, before ? `trước: ${before["split:heldout"].neutralised}/${before["split:heldout"].total}` : "viết trước khi chỉnh phòng thủ"),
+      card("Dương tính giả (câu lành tính)", `${d.benign.flagged}/${d.benign.total}`, before ? `trước: ${d.before.benign.flagged}/${d.before.benign.total}` : ""),
+      card("Dương tính giả trên corpus", d.corpus ? `${d.corpus.flags}/${d.corpus.sentences}` : "—", d.corpus ? "chỉ là template chat in trong phụ lục CodeAct" : "chưa tải corpus"),
+    ].join("");
+    const techs = [...new Set(d.attacks.map(a => a.technique))];
+    const cell = x => `<td class="num ${x.rate === 1 ? "good" : x.rate === 0 ? "bad" : ""}">${x.neutralised}/${x.total}</td>`;
+    const row = (label, key, resid) => `<tr${resid ? ' class="muted"' : ""}><td>${label}</td>${["none", "parser", "sanitizer", "full"].map(l => cell(S[l][key])).join("")}${
+      before ? `<td class="num">${before[key] ? before[key].neutralised + "/" + before[key].total : "—"}</td>` : ""}</tr>`;
+    $("#inj-table").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Kỹ thuật</th><th>Không phòng thủ</th><th>Chỉ L1 parser</th><th>Chỉ L2 sanitizer</th><th>L1 + L2 (hệ thống)</th>${before ? "<th>Guardrail cũ (D2)</th>" : ""}</tr></thead><tbody>
+      ${techs.map(t => row(TECH_VI[t] || t, t, t === "semantic_persuasion")).join("")}
+      ${row("<b>Tổng</b>", "all")}</tbody></table></div>`;
+    setupPlayground(d);
+    renderTechExamples(d);
+  }
+
+  const TECH_NOTE = {
+    direct_override: "Ra lệnh thẳng cho AI bỏ qua hướng dẫn gốc.", paraphrased_override: "Cùng ý nhưng đổi từ ngữ để né bộ lọc từ khoá.",
+    role_hijack: "Bắt AI đóng một vai không bị ràng buộc.", fake_template: "Giả thẻ hệ thống hoặc định dạng chat để trông như lệnh của hệ thống.",
+    review_manipulation: "Nhắm riêng vào bản phản biện: khen, ép điểm, giấu điểm yếu.", prompt_leak: "Đòi AI in system prompt hoặc mã nội bộ.",
+    tool_abuse: "Ép AI gọi công cụ ngoài nhiệm vụ.", exfiltration: "Ép gửi dữ liệu ra ngoài (đọc file, gọi URL).",
+    obfuscation: "Che chữ: ở ví dụ, các chữ o và i là ký tự Cyrillic trông y hệt chữ Latin; còn có ký tự vô hình, base64, leetspeak.",
+    multilingual: "Đổi sang ngôn ngữ khác để né bộ lọc tiếng Anh.", format_evasion: "Ngắt câu qua nhiều dòng, giấu trong bảng hoặc trích dẫn.",
+    authority: "Mạo danh giảng viên, quản trị viên, ban tổ chức.", memory_poisoning: "Gài “bài học” giả vào bộ nhớ dài hạn.",
+    hidden_pdf_text: "Chữ trắng / xám nhạt / cỡ rất nhỏ / bị hình che: người đọc không thấy nhưng máy đọc được.",
+    semantic_persuasion: "Không có mệnh lệnh, chỉ là câu khẳng định nghe như nội dung bài báo.",
+    decoy: "Gài một “hạn chế” vô hại do tác giả tự nêu để Critic bỏ điểm yếu thật.",
+  };
+
+  function renderTechExamples(d) {
+    const first = {};
+    for (const a of d.attacks) if (!first[a.technique]) first[a.technique] = a;
+    const REDACT = "[REDACTED: suspected injected instruction]";
+    const rows = Object.keys(TECH_VI).filter(t => first[t]).map(t => {
+      const a = first[t], hidden = a.channel === "pdf-hidden";
+      const after = hidden ? `<i class="muted">(đoạn chữ ẩn bị loại ngay khi đọc PDF)</i>` : (a.neutralised.sanitizer
+        ? `<span class="redacted">${esc(REDACT)}</span>` : `<span class="bad">không bị che: AI đọc nguyên văn</span>`);
+      const layer = hidden ? "L1 parser" : (a.neutralised.sanitizer ? `L2 · <code>${esc(a.rule)}</code>` : "không lớp nào chặn (chỉ L3/L4/L5 hạn chế)");
+      const ok = hidden || a.neutralised.sanitizer;
+      return `<tr><td><b>${esc(TECH_VI[t])}</b><div class="muted small">${esc(TECH_NOTE[t] || "")}</div></td>
+        <td class="ex-cell"><code>${esc(a.text.slice(0, 170))}</code>${hidden ? `<div class="muted small">(in bằng chữ trắng trên nền trắng)</div>` : ""}</td>
+        <td class="ex-cell">${after}</td><td class="${ok ? "good" : "bad"}">${layer}</td>
+        <td>${hidden ? "" : `<button class="btn" data-try="${esc(a.id)}">Thử</button>`}</td></tr>`;
+    });
+    const ex = data.studies?.examples;
+    if (ex) {
+      for (const [kind, label] of [["assertion", "Khẳng định sai của tác giả"], ["decoy", "Decoy (hạn chế mồi)"]]) {
+        const e = ex[kind];
+        rows.push(`<tr><td><b>${label}</b><div class="muted small">${esc(TECH_NOTE[kind] || "Khẳng định giả làm điểm yếu thật có vẻ đã được giải quyết.")}</div></td>
+          <td class="ex-cell"><code>${esc(e.text)}</code><div class="muted small">(${esc(e.paper)}, trục ${esc(e.axis)}; in ở lề trang)</div></td>
+          <td class="ex-cell"><span class="bad">không bị che: AI đọc nguyên văn</span></td>
+          <td class="${kind === "decoy" ? "bad" : "good"}">${kind === "decoy" ? "không lớp nào chặn; L5 giảm phần nào (38% → 25%)" : "không bị chặn nhưng Critic đối kháng nghi ngờ (0/20 tin theo)"}</td>
+          <td><button class="btn" data-try-text="${esc(e.text)}">Thử</button></td></tr>`);
+      }
+    }
+    $("#tech-examples").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Kỹ thuật</th><th>Ví dụ tấn công</th><th>LLM thấy sau phòng thủ</th><th>Lớp xử lý</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+    const byId = Object.fromEntries(d.attacks.map(a => [a.id, a]));
+    $("#tech-examples").querySelectorAll("button[data-try], button[data-try-text]").forEach(b => b.addEventListener("click", () => {
+      const text = b.dataset.try ? byId[b.dataset.try].text : b.dataset.tryText;
+      if (guardTry) guardTry(text);
+    }));
+  }
+
+  function renderStudies() {
+    const d = data.studies;
+    if (!d) { $("#studies-e2e").innerHTML = ""; return; }
+    const f = x => `${x[0]}/${x[1]}`;
+    $("#studies-e2e").innerHTML = `<div class="panel-title">Pipeline đầy đủ trên PDF bị chèn payload (432 lượt, 4 bài báo)</div><div class="table-wrap"><table>
+      <thead><tr><th>Model</th><th>Lượt chạy</th><th>Tấn công dạng mệnh lệnh thành công</th><th>…khi không phòng thủ</th><th>Chữ ẩn bị trích làm bằng chứng: không L1</th><th>…có L1</th></tr></thead><tbody>
+      ${d.e2e.map(r => `<tr><td><code>${r.model}</code></td><td class="num">${r.runs}</td><td class="num">${f(r.imperative)}</td><td class="num">${f(r.imperative_no_defence)}</td>
+        <td class="num bad">${f(r.hidden_cited_no_defence)}</td><td class="num good">${f(r.hidden_cited_l1)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted small">Model hiện đại tự chống được tấn công mệnh lệnh (không có gì để phòng thủ giảm thêm); L1 loại hẳn việc trích chữ người đọc không thấy.</p>`;
+    const s = d.semantic;
+    if (!s) { $("#studies-semantic").innerHTML = ""; return; }
+    const names = {none: "Không phòng thủ", system: "L1 + L2 + L3", "system+L5": "L1 + L2 + L3 + L5"};
+    const pc = x => Math.round(100 * x[0] / x[1]) + "%";
+    $("#studies-semantic").innerHTML = `<div class="panel-title">Tấn công decoy (gài một “hạn chế” vô hại do chính tác giả thừa nhận) · ${s.model}</div><div class="table-wrap"><table>
+      <thead><tr><th>Cấu hình</th><th>Critic nêu decoy</th><th>Điểm yếu thật còn được giữ (bị tấn công)</th><th>…(lượt sạch)</th></tr></thead><tbody>
+      ${Object.entries(s.configs).map(([k, v]) => `<tr><td>${names[k]}</td><td class="num">${f(v.decoy_adopted)} (${pc(v.decoy_adopted)})</td><td class="num">${f(v.real_kept_attacked)} (${pc(v.real_kept_attacked)})</td><td class="num">${f(v.real_kept_clean)} (${pc(v.real_kept_clean)})</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted small">Decoy làm tỉ lệ giữ điểm yếu thật giảm từ ${pc(s.configs.none.real_kept_clean)} xuống ${pc(s.configs.none.real_kept_attacked)} (Fisher p = ${s.p.attack_vs_clean_no_defence}); L1–L3 không chặn được.
+      L5 giảm decoy ${pc(s.configs.none.decoy_adopted)} → ${pc(s.configs["system+L5"].decoy_adopted)} nhưng chưa có ý nghĩa thống kê (p = ${s.p.l5_vs_none_decoy}). 2 bài báo, một model, nhãn do AI soạn.</p>`;
+  }
+
+  function setupPlayground(d) {
+    const sel = $("#guard-sample"), input = $("#guard-input");
+    const samples = d.attacks.filter(a => a.channel === "text");
+    sel.innerHTML = `<option value="">— tự nhập —</option>` + samples.map(a => `<option value="${a.id}">${a.id} · ${esc(TECH_VI[a.technique] || a.technique)}</option>`).join("");
+    const byId = Object.fromEntries(d.attacks.map(a => [a.id, a]));
+    const show = (clean, flags, note) => {
+      const html = esc(clean).split(esc("[REDACTED: suspected injected instruction]")).join('<span class="redacted">[REDACTED: suspected injected instruction]</span>');
+      $("#guard-output").innerHTML = `<p>${html}</p>` + (flags.length ? `<ul class="small">${flags.map(f => `<li><code>${esc(f.rule)}</code>${f.category ? " · " + esc(f.category) : ""} · nguồn <code>${esc(f.source)}</code></li>`).join("")}</ul>` : `<p class="muted small">Không có câu nào bị che.</p>`)
+        + (note ? `<p class="muted small">${note}</p>` : "");
     };
-    $("#guard-input").addEventListener("input", run);
+    const run = async () => {
+      const text = input.value;
+      try {
+        const r = await fetch("api/sanitize", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({text, source: "user"})});
+        if (!r.ok) throw new Error(r.status);
+        const j = await r.json();
+        show(j.clean, j.flags, "Kết quả của hàm <code>sanitize()</code> thật trên máy chủ.");
+      } catch {
+        const a = byId[sel.value];
+        if (a && a.text === text) show(a.neutralised.sanitizer ? "[REDACTED: suspected injected instruction]" : text, [], `Kết quả đã ghi: ${a.neutralised.sanitizer ? "bị vô hiệu" : "lọt qua bộ lọc"} (không có máy chủ). Chạy <code>critic-agent serve</code> để thử văn bản tự nhập.`);
+        else $("#guard-output").innerHTML = `<p class="muted">Cần chạy <code>uv run critic-agent serve</code> để thử văn bản tự nhập bằng guardrail thật.</p>`;
+      }
+    };
+    sel.addEventListener("change", () => { if (sel.value) { input.value = byId[sel.value].text; run(); } });
+    $("#guard-run").addEventListener("click", run);
     run();
+    guardTry = text => { sel.value = ""; input.value = text; run(); input.scrollIntoView({behavior: "smooth", block: "center"}); };
   }
 
   // ------------------------------------------------------------------ boot
   (async function boot() {
-    [data.system, data.index, data.graph, data.summary, data.agreement] = await Promise.all(
-      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json"].map(getJSON));
+    [data.system, data.index, data.graph, data.summary, data.agreement, data.injection, data.studies] = await Promise.all(
+      ["data/system.json", "data/index.json", "data/graph.json", "data/summary.json", "data/judge_agreement.json", "data/injection_eval.json", "data/injection_studies.json"].map(getJSON));
     renderOverview();
     renderArchitecture();
     setupPlayer();

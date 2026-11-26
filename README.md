@@ -17,11 +17,12 @@ guardrail playground. Run it locally with live reviews: `uv run critic-agent ser
 |---|---|
 | `src/critic_agent/` | LangGraph pipeline, MCP server + tool gateway, memory, knowledge graph, evaluation |
 | `tests/` | Offline tests (mock LLM) |
-| `eval/` | Paper corpus manifest, human labels, task definitions |
+| `eval/` | Paper corpus manifest, human labels, task definitions, prompt-injection attack set (`injections.json`, `benign.json`) |
 | `scripts/` | Download, reproduction and export scripts |
 | `web/` | Critic-Agent Explorer (static site for GitHub Pages) |
 | `report/D2/` | D2 progress report (LaTeX) |
-| `docs/` | Architecture notes and diagrams |
+| `docs/` | Architecture notes, threat model (`threat_model.md`) |
+| `results/` | Measured results (`injection_eval*.json`) |
 
 ## Setup
 
@@ -47,6 +48,7 @@ uv run critic-agent baseline swe-agent.pdf --seed 1               # simpler conf
 uv run pytest -q                                                  # offline tests (mock LLM)
 uv run critic-agent serve                                         # web Explorer + live runs on http://localhost:8000
 uv run python scripts/export_web_data.py                          # refresh web/data from runs/ and results/
+uv run python -m critic_agent.injection_eval --export-web      # measure the prompt-injection defences, refresh web/data/injection_eval.json
 ```
 
 Each run writes `output.json`, `report.md`, `trace.jsonl` (event log replayed by the web Explorer),

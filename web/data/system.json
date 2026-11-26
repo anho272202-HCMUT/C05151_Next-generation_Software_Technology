@@ -109,18 +109,279 @@
    "description": "Run Python in Docker (no network, 1 GB, 30 s); disabled by default"
   }
  ],
- "injection_patterns": [
-  "\\b(ignore|disregard|forget|override)\\b[^.\\n]{0,40}\\b(previous|prior|above|earlier|all|your)\\b[^.\\n]{0,20}\\b(instruction|prompt|rule|guideline|task)s?",
-  "\\byou are now\\b|\\b(follow|here are) (the |these )?new instructions\\b|\\b(developer|admin|god|jailbreak) mode\\b",
-  "\\b(reveal|print|show|repeat|output)\\b[^.\\n]{0,30}\\b(system prompt|hidden prompt|instructions above)\\b",
-  "\\b(dear|attention|note to( the)?|hey)\\s+(ai|llm|language model|assistant|automated reviewer|ai reviewer|reviewer model)\\b",
-  "\\bto (any|all) (ai|llm|automated) (reviewer|assistant|system|agent)s?\\b",
-  "\\b(do not|don't|never)\\s+(report|mention|flag|criticize|critique|list|output)\\b[^.\\n]{0,40}\\b(weakness|limitation|flaw|contamination)",
-  "\\b(rate|score|grade)\\b[^.\\n]{0,20}\\b(this paper|the paper|it)\\b[^.\\n]{0,20}\\b(10|perfect|flawless|maximum)",
-  "\\b(this paper|the paper)\\s+(is|has)\\s+(flawless|perfect|no (weaknesses|limitations|flaws))\\b",
-  "\\b(execute_code_in_sandbox|save_annotation|delete_annotation|publish_review|search_paper|pdf_ingest)\\b",
-  "\\b(respond|reply|answer)\\s+only\\s+with\\b|\\boutput\\s+exactly\\b",
-  "\\bsystem\\s*:\\s|\\[\\s*system\\s*\\]|<\\s*/?\\s*system\\s*>"
- ],
+ "guardrail": {
+  "rules": [
+   {
+    "id": "override",
+    "category": "override",
+    "gated": true
+   },
+   {
+    "id": "override-context",
+    "category": "override",
+    "gated": true
+   },
+   {
+    "id": "override-above",
+    "category": "override",
+    "gated": true
+   },
+   {
+    "id": "new-instructions",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "new-instructions-label",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "from-now-on",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "outdated",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "instead-of-above",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "follow-new",
+    "category": "override",
+    "gated": false
+   },
+   {
+    "id": "you-are-now",
+    "category": "role-hijack",
+    "gated": false
+   },
+   {
+    "id": "jailbreak-mode",
+    "category": "role-hijack",
+    "gated": false
+   },
+   {
+    "id": "pretend",
+    "category": "role-hijack",
+    "gated": true
+   },
+   {
+    "id": "unrestricted",
+    "category": "role-hijack",
+    "gated": false
+   },
+   {
+    "id": "act-as-author",
+    "category": "role-hijack",
+    "gated": true
+   },
+   {
+    "id": "hypothetical",
+    "category": "role-hijack",
+    "gated": false
+   },
+   {
+    "id": "chat-tokens",
+    "category": "fake-template",
+    "gated": false
+   },
+   {
+    "id": "md-header-role",
+    "category": "fake-template",
+    "gated": false
+   },
+   {
+    "id": "json-forgery",
+    "category": "fake-template",
+    "gated": false
+   },
+   {
+    "id": "address-ai",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "ai-reviewers-should",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "if-you-are-llm",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "positive-review",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "recommend-accept",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "deserves-top",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "rate-perfect",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "always-score",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "flawless-paper",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "suppress",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "claim-that",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "manipulate-axes",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "forced-output",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "forced-output-quote",
+    "category": "review-manipulation",
+    "gated": true
+   },
+   {
+    "id": "pipeline-agents",
+    "category": "review-manipulation",
+    "gated": false
+   },
+   {
+    "id": "leak-verb",
+    "category": "prompt-leak",
+    "gated": true
+   },
+   {
+    "id": "leak-above",
+    "category": "prompt-leak",
+    "gated": true
+   },
+   {
+    "id": "leak-question",
+    "category": "prompt-leak",
+    "gated": false
+   },
+   {
+    "id": "verbatim",
+    "category": "prompt-leak",
+    "gated": true
+   },
+   {
+    "id": "internal-id",
+    "category": "prompt-leak",
+    "gated": false
+   },
+   {
+    "id": "tool-names",
+    "category": "tool-abuse",
+    "gated": false
+   },
+   {
+    "id": "tool-write",
+    "category": "tool-abuse",
+    "gated": true
+   },
+   {
+    "id": "md-image",
+    "category": "exfiltration",
+    "gated": false
+   },
+   {
+    "id": "send-out",
+    "category": "exfiltration",
+    "gated": true
+   },
+   {
+    "id": "authority-from",
+    "category": "authority",
+    "gated": false
+   },
+   {
+    "id": "authority-label",
+    "category": "authority",
+    "gated": false
+   },
+   {
+    "id": "memory-lesson",
+    "category": "memory-poisoning",
+    "gated": false
+   },
+   {
+    "id": "next-time",
+    "category": "memory-poisoning",
+    "gated": false
+   },
+   {
+    "id": "never-question",
+    "category": "memory-poisoning",
+    "gated": false
+   },
+   {
+    "id": "decode-follow",
+    "category": "obfuscation",
+    "gated": false
+   },
+   {
+    "id": "vi-override",
+    "category": "multilingual",
+    "gated": false
+   },
+   {
+    "id": "fr-override",
+    "category": "multilingual",
+    "gated": false
+   },
+   {
+    "id": "es-override",
+    "category": "multilingual",
+    "gated": false
+   },
+   {
+    "id": "de-override",
+    "category": "multilingual",
+    "gated": false
+   },
+   {
+    "id": "zh-override",
+    "category": "multilingual",
+    "gated": false
+   },
+   {
+    "id": "ja-override",
+    "category": "multilingual",
+    "gated": false
+   }
+  ]
+ },
  "model": "qwen2.5:3b"
 }

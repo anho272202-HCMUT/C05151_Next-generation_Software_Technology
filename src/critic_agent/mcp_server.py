@@ -25,7 +25,7 @@ from mcp_types import ToolAnnotations
 
 from .config import load_settings
 from .graph_store import MAX_NODES, JsonGraphStore
-from .guardrail import sanitize
+from .guardrail import clean_paper
 from .pdf_parser import parse_pdf, split_sentences
 from .permissions import check_token
 from .retrieval import HashEmbedder, OllamaEmbedder, PaperIndex, build_chunks
@@ -79,20 +79,11 @@ def _paper(paper_id: str) -> dict:
 def pdf_ingest(path: str) -> str:
     """Parse a PDF from the papers directory into numbered sentences, sanitise it and build the search index."""
     paper = parse_pdf(_allowed_pdf(path))
-    flags = []
-    if settings.guardrail:
-        flags += [{"source": "pdf-hidden", "page": h.page, "snippet": h.text[:160]} for h in paper.hidden_spans]
-        pages = []
-        for page_no, text in enumerate(paper.visible_pages, start=1):
-            clean, page_flags = sanitize(text, "pdf", page_no)
-            pages.append(clean)
-            flags += [f.to_dict() for f in page_flags]
-    else:
-        pages = paper.raw_pages
+    pages, flags = clean_paper(paper, hidden=settings.use_l1, sanitizer=settings.use_l2)
     sentences = split_sentences(pages)
     chunks = build_chunks(sentences)
     embedder = _embedder()
-    tag = f"{'g' if settings.guardrail else 'raw'}-{embedder.name if embedder else 'none'}"
+    tag = f"g{int(settings.use_l1)}{int(settings.use_l2)}-{embedder.name if embedder else 'none'}"
     index = PaperIndex(chunks, embedder, settings.cache_dir / f"{paper.paper_id}-{tag}.npy")
     _papers[paper.paper_id] = {"sentences": {s.sid: s for s in sentences}, "index": index}
     first = [s.text for s in sentences if s.page <= 2][:60]

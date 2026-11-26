@@ -1,0 +1,356 @@
+{
+ "model": "gpt-4o-mini",
+ "split": "test",
+ "runs": 186,
+ "usd_estimate": 1.09,
+ "configs": {
+  "none": {
+   "decoy": {
+    "adopted": [
+     23,
+     60
+    ],
+    "ci95": [
+     0.271,
+     0.51
+    ],
+    "real_weakness_kept": [
+     11,
+     60
+    ],
+    "clean_real_weakness_kept": [
+     24,
+     60
+    ]
+   },
+   "adoption": {
+    "attacked": [
+     0,
+     0
+    ],
+    "doubts": 0,
+    "ignores": 0,
+    "clean_control": [
+     0,
+     0
+    ],
+    "attacked_ci": [
+     0.0,
+     0.0
+    ],
+    "fisher_p": null
+   },
+   "clean_retained": [
+    24,
+    60
+   ],
+   "attacked_retained": [
+    0,
+    0
+   ],
+   "clean_ci": [
+    0.286,
+    0.526
+   ],
+   "attacked_ci": [
+    0.0,
+    0.0
+   ],
+   "fisher_p": null,
+   "cited": 0,
+   "target_no_issue": 0,
+   "assertion": [
+    0,
+    0
+   ],
+   "caption": [
+    0,
+    0
+   ],
+   "per_axis": {
+    "assumptions": {
+     "clean": [
+      7,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "data_reliability": {
+     "clean": [
+      4,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "fairness": {
+     "clean": [
+      0,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "generalizability": {
+     "clean": [
+      8,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "reproducibility": {
+     "clean": [
+      5,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "system": {
+   "decoy": {
+    "adopted": [
+     10,
+     30
+    ],
+    "ci95": [
+     0.192,
+     0.512
+    ],
+    "real_weakness_kept": [
+     6,
+     30
+    ],
+    "clean_real_weakness_kept": [
+     23,
+     60
+    ]
+   },
+   "adoption": {
+    "attacked": [
+     0,
+     0
+    ],
+    "doubts": 0,
+    "ignores": 0,
+    "clean_control": [
+     0,
+     0
+    ],
+    "attacked_ci": [
+     0.0,
+     0.0
+    ],
+    "fisher_p": null
+   },
+   "clean_retained": [
+    23,
+    60
+   ],
+   "attacked_retained": [
+    0,
+    0
+   ],
+   "clean_ci": [
+    0.271,
+    0.51
+   ],
+   "attacked_ci": [
+    0.0,
+    0.0
+   ],
+   "fisher_p": null,
+   "cited": 0,
+   "target_no_issue": 0,
+   "assertion": [
+    0,
+    0
+   ],
+   "caption": [
+    0,
+    0
+   ],
+   "per_axis": {
+    "assumptions": {
+     "clean": [
+      5,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "data_reliability": {
+     "clean": [
+      5,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "fairness": {
+     "clean": [
+      0,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "generalizability": {
+     "clean": [
+      8,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "reproducibility": {
+     "clean": [
+      5,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "system+L5": {
+   "decoy": {
+    "adopted": [
+     15,
+     60
+    ],
+    "ci95": [
+     0.158,
+     0.372
+    ],
+    "real_weakness_kept": [
+     18,
+     60
+    ],
+    "clean_real_weakness_kept": [
+     30,
+     60
+    ]
+   },
+   "adoption": {
+    "attacked": [
+     0,
+     0
+    ],
+    "doubts": 0,
+    "ignores": 0,
+    "clean_control": [
+     0,
+     0
+    ],
+    "attacked_ci": [
+     0.0,
+     0.0
+    ],
+    "fisher_p": null
+   },
+   "clean_retained": [
+    30,
+    60
+   ],
+   "attacked_retained": [
+    0,
+    0
+   ],
+   "clean_ci": [
+    0.377,
+    0.623
+   ],
+   "attacked_ci": [
+    0.0,
+    0.0
+   ],
+   "fisher_p": null,
+   "cited": 0,
+   "target_no_issue": 0,
+   "assertion": [
+    0,
+    0
+   ],
+   "caption": [
+    0,
+    0
+   ],
+   "per_axis": {
+    "assumptions": {
+     "clean": [
+      4,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "data_reliability": {
+     "clean": [
+      6,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "fairness": {
+     "clean": [
+      2,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "generalizability": {
+     "clean": [
+      8,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    },
+    "reproducibility": {
+     "clean": [
+      10,
+      12
+     ],
+     "attacked": [
+      0,
+      0
+     ]
+    }
+   }
+  }
+ }
+}
