@@ -49,7 +49,16 @@ uv run pytest -q                                                  # offline test
 uv run critic-agent serve                                         # web Explorer + live runs on http://localhost:8000
 uv run python scripts/export_web_data.py                          # refresh web/data from runs/ and results/
 uv run python -m critic_agent.injection_eval --export-web      # measure the prompt-injection defences, refresh web/data/injection_eval.json
+uv run python scripts/calibrate.py --papers-dir ~/Desktop/Paper --seeds 1 2 3   # paper scores on a PDF folder vs eval/calibration.json
 ```
+
+Two different scores appear in a review. The **critique score** (0-10 per axis) is the Evaluator's grade of a critique:
+on-axis, specific, supported by the cited sentences. The **paper score** (1-10, ICLR/NeurIPS reviewer scale) is the
+Meta-reviewer's assessment of the paper, weighing its strengths against the verified weaknesses. A strong paper can
+get low critique scores simply because it has few real weaknesses to find.
+
+The axis definitions depend on the kind of paper, picked by the Summarizer: `coding_agent`, `agent_benchmark`,
+`llm_training`, `llm_evaluation` or `general` (`prompts.DOMAIN_AXIS_GUIDES`).
 
 Each run writes `output.json`, `report.md`, `trace.jsonl` (event log replayed by the web Explorer),
 `audit.jsonl` (every tool request incl. denials) and `cost.json` (tokens, latency, USD, gpt-4o-mini-equivalent USD).
@@ -57,7 +66,7 @@ Each run writes `output.json`, `report.md`, `trace.jsonl` (event log replayed by
 ## Architecture (D2)
 
 `ingest → Summarizer → Orchestrator → 5 axis Critics (parallel, LangGraph Send) → Evaluator → targeted reflection
-(rejected axes only, ≤2 rounds, stop when no improvement) → Synthesizer`. Critics cite sentence ids; the system copies the
+(rejected axes only, ≤2 rounds, stop when no improvement) → Meta-reviewer (paper score) → Synthesizer`. Critics cite sentence ids; the system copies the
 verbatim sentence, and the Evaluator checks ids deterministically before an LLM judge scores axis-fit and support.
 All tools go through `ToolGateway` → MCP server. See `docs/architecture.md`.
 

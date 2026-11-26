@@ -1,6 +1,7 @@
 """LangGraph control loop and the single-prompt baseline.
 
-ingest -> summarize -> orchestrate -> [critic x5 in parallel] -> evaluate -> (rejected axes -> critic) -> synthesize
+ingest -> summarize -> orchestrate -> [critic x5 in parallel] -> evaluate -> (rejected axes -> critic)
+    -> meta_review -> synthesize
 """
 
 from __future__ import annotations
@@ -33,13 +34,15 @@ def build_graph(ctx: RunContext):
     g.add_node("orchestrate", partial(agents.orchestrate, ctx=ctx))
     g.add_node("critic", partial(agents.critic, ctx=ctx))
     g.add_node("evaluate", partial(agents.evaluate, ctx=ctx))
+    g.add_node("meta_review", partial(agents.meta_review, ctx=ctx))
     g.add_node("synthesize", partial(agents.synthesize, ctx=ctx))
     g.add_edge(START, "ingest")
     g.add_edge("ingest", "summarize")
     g.add_edge("summarize", "orchestrate")
     g.add_conditional_edges("orchestrate", agents.dispatch, ["critic"])
     g.add_edge("critic", "evaluate")
-    g.add_conditional_edges("evaluate", agents.route_after_evaluate, ["critic", "synthesize"])
+    g.add_conditional_edges("evaluate", agents.route_after_evaluate, ["critic", "meta_review"])
+    g.add_edge("meta_review", "synthesize")
     g.add_edge("synthesize", END)
     return g.compile()
 
@@ -118,4 +121,6 @@ def _save(run_dir: Path, final: dict, trace: Trace, tracker: CostTracker) -> Non
 def config_dict(s: Settings) -> dict:
     return {"provider": s.llm_provider, "model": s.llm_model, "temperature": s.temperature,
             "max_reflections": s.max_reflections, "accept_score": s.accept_score, "guardrail": s.guardrail, "layers": {"l1": s.use_l1, "l2": s.use_l2, "l3": s.use_l3, "l5": s.use_l5},
-            "retrieval": s.retrieval, "use_memory": s.use_memory, "use_graph": s.use_graph}
+            "retrieval": s.retrieval, "use_memory": s.use_memory, "use_graph": s.use_graph,
+            "effort": s.effort if s.llm_provider == "anthropic" else None, "judge_temperature": s.judge_temperature,
+            "evidence_token_budget": s.evidence_token_budget, "search_k": s.search_k, "paper_score": s.paper_score}

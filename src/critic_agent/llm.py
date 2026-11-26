@@ -30,7 +30,7 @@ class LLMClient(Protocol):
     model: str
 
     async def complete(self, system: str, user: str, *, agent: str, seed: int | None = None,
-                       max_tokens: int = 900) -> LLMResponse: ...
+                       max_tokens: int = 900, temperature: float | None = None) -> LLMResponse: ...
 
 
 class OllamaLLM:
@@ -41,13 +41,13 @@ class OllamaLLM:
         self._tracker = tracker
         self._client = httpx.AsyncClient(timeout=900)
 
-    async def complete(self, system, user, *, agent, seed=None, max_tokens=900):
+    async def complete(self, system, user, *, agent, seed=None, max_tokens=900, temperature=None):
         start = time.perf_counter()
         resp = await self._client.post(self._url, json={
             "model": self.model, "stream": False, "format": "json",
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "options": {"temperature": self._settings.temperature, "seed": seed, "num_ctx": self._settings.num_ctx,
-                        "num_predict": max_tokens},
+            "options": {"temperature": self._settings.temperature if temperature is None else temperature,
+                        "seed": seed, "num_ctx": self._settings.num_ctx, "num_predict": max_tokens},
         })
         resp.raise_for_status()
         data = resp.json()
@@ -57,7 +57,21 @@ class OllamaLLM:
         return LLMResponse(data["message"]["content"], in_tok, out_tok, latency)
 
 
+# Models that accept the server-side refusal fallback (`fallbacks: "default"`, beta header below).
+ANTHROPIC_FALLBACK_MODELS = ("claude-fable-5-2", "claude-fable-5-1", "claude-opus-5-5", "claude-opus-5",
+                             "claude-sonnet-5-5")
+ANTHROPIC_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+
 class AnthropicLLM:
+    """Claude via the Messages API.
+
+    Current Claude models always think, and thinking tokens count against `max_tokens`: the JSON-sized budgets the
+    pipeline uses for the local model (600-1200) would be used up by thinking and leave an empty or cut-off answer.
+    Every call therefore gets at least `hosted_min_max_tokens`; depth is set with `effort` instead. Sampling
+    parameters are not sent (recent models reject them), so `temperature` is ignored here.
+    """
+
     def __init__(self, settings: Settings, tracker: CostTracker):
         from anthropic import AsyncAnthropic
 
@@ -65,17 +79,28 @@ class AnthropicLLM:
             raise ValueError("ANTHROPIC_API_KEY is not set")
         self.model = settings.llm_model
         self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-        self._temperature = settings.temperature
+        self._effort = settings.effort
+        self._min_max_tokens = settings.hosted_min_max_tokens
         self._tracker = tracker
 
-    async def complete(self, system, user, *, agent, seed=None, max_tokens=900):
+    async def complete(self, system, user, *, agent, seed=None, max_tokens=900, temperature=None):
         start = time.perf_counter()
-        resp = await self._client.messages.create(
-            model=self.model, system=system + "\nRespond with one JSON object only.", max_tokens=max_tokens,
-            messages=[{"role": "user", "content": user}])  # recent models take no sampling parameters
+        kwargs = dict(model=self.model, system=system + "\nRespond with one JSON object only.",
+                      max_tokens=max(max_tokens, self._min_max_tokens),
+                      messages=[{"role": "user", "content": user}])
+        if self._effort:
+            kwargs["output_config"] = {"effort": self._effort}
+        if self.model in ANTHROPIC_FALLBACK_MODELS:  # a safety-classifier refusal is retried on a fallback model
+            resp = await self._client.beta.messages.create(**kwargs, betas=[ANTHROPIC_FALLBACK_BETA],
+                                                           fallbacks="default")
+        else:
+            resp = await self._client.messages.create(**kwargs)
         latency = time.perf_counter() - start
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         self._tracker.record(agent, self.model, resp.usage.input_tokens, resp.usage.output_tokens, latency)
+        if resp.stop_reason == "refusal":  # RunContext.ask retries, then degrades the step to {}
+            details = getattr(resp, "stop_details", None)
+            raise RuntimeError(f"model refused (category {getattr(details, 'category', None)})")
+        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         return LLMResponse(text, resp.usage.input_tokens, resp.usage.output_tokens, latency)
 
 
@@ -91,7 +116,7 @@ class OpenAILLM:
         self._send_temperature = True
         self._tracker = tracker
 
-    async def complete(self, system, user, *, agent, seed=None, max_tokens=900):
+    async def complete(self, system, user, *, agent, seed=None, max_tokens=900, temperature=None):
         from openai import BadRequestError
 
         start = time.perf_counter()
@@ -101,7 +126,7 @@ class OpenAILLM:
                       response_format={"type": "json_object"},
                       messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
         if self._send_temperature:
-            kwargs["temperature"] = self._temperature
+            kwargs["temperature"] = self._temperature if temperature is None else temperature
         try:
             resp = await self._client.chat.completions.create(**kwargs)
         except BadRequestError as exc:
@@ -124,12 +149,12 @@ class MockLLM:
     def __init__(self, tracker: CostTracker):
         self._tracker = tracker
 
-    async def complete(self, system, user, *, agent, seed=None, max_tokens=900):
+    async def complete(self, system, user, *, agent, seed=None, max_tokens=900, temperature=None):
         sentence_ids = re.findall(r"\[(p\d+s\d+)\]", user)
         if agent == "summarizer":
             out = {"title": "Mock paper", "task": "program repair", "method": "agent", "benchmarks": ["SWE-bench"],
                    "baselines": ["RAG"], "models": ["GPT-4"], "claims": ["resolves 12% of issues"],
-                   "code_url": None}
+                   "code_url": None, "domain": "coding_agent"}
         elif agent == "orchestrator":
             out = {"plan": [{"axis": a, "priority": "high", "queries": [f"{a} evaluation setup"]}
                             for a in ("assumptions", "fairness", "data_reliability", "generalizability",
@@ -140,6 +165,11 @@ class MockLLM:
         elif agent == "evaluator":
             ids = re.findall(r'"id": "([a-z_]+)"', user)
             out = {"scores": [{"id": i, "score": 8, "supported": True, "feedback": ""} for i in ids]}
+        elif agent == "meta_reviewer":
+            out = {"strengths": ["Evaluates on a real-world benchmark."],
+                   "dimensions": {"soundness": 7, "contribution": 7, "clarity": 8, "significance": 7,
+                                  "reproducibility": 6},
+                   "overall": 7, "confidence": 3, "justification": "Solid evaluation with a budget question."}
         elif agent == "baseline":
             out = {"critiques": [{"axis": "fairness", "weakness": "Unclear budget.", "evidence_ids": sentence_ids[:1],
                                   "question": "Same budget?"}]}

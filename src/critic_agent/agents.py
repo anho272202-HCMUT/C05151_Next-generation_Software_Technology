@@ -1,4 +1,4 @@
-"""Agent nodes: ingest, Summarizer, Orchestrator, per-axis Critic workers, Evaluator, Synthesizer."""
+"""Agent nodes: ingest, Summarizer, Orchestrator, per-axis Critic workers, Evaluator, Meta-reviewer, Synthesizer."""
 
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ class ReviewState(TypedDict, total=False):
     critiques: Annotated[list[dict], operator.add]  # every attempt from every worker
     best: dict[str, dict]
     feedback: dict[str, str]
+    assessment: dict
     final: dict
 
 
@@ -57,7 +58,8 @@ class RunContext:
     lessons_store: Any = None  # lessons.LessonStore, optional
     _calls: int = 0
 
-    async def ask(self, role: str, agent: str, user: str, max_tokens: int = 700) -> dict:
+    async def ask(self, role: str, agent: str, user: str, max_tokens: int = 700,
+                  temperature: float | None = None) -> dict:
         """LLM call with JSON parsing; retries with a fresh seed on backend errors or malformed JSON.
 
         Returns {} after MAX_LLM_ATTEMPTS so one bad generation degrades a step instead of crashing the run.
@@ -67,7 +69,7 @@ class RunContext:
             self._calls += 1
             try:
                 resp = await self.llm.complete(system, user, agent=agent, seed=self.seed * 1000 + self._calls,
-                                               max_tokens=max_tokens)
+                                               max_tokens=max_tokens, temperature=temperature)
             except Exception as exc:  # timeouts, 5xx, degenerate generation
                 self.trace.emit("llm_error", agent, attempt=attempt, error=f"{type(exc).__name__}: {exc}"[:200])
                 continue
@@ -105,9 +107,11 @@ async def summarize(state: ReviewState, ctx: RunContext) -> ReviewState:
         "paper_id": state["paper_id"], "query": "experimental setup baselines benchmark model results", "k": 3})
     setup = "\n".join(s["text"] for h in hits for s in h["sentences"])
     card = await ctx.ask("summarizer", "summarizer",
-                         prompts.summarizer_user(state["first_pages"][:4000], setup[:2500], ctx.settings.use_l3))
+                         prompts.summarizer_user(state["first_pages"][:ctx.settings.first_pages_chars], setup[:2500],
+                                                 ctx.settings.use_l3))
     if state.get("title") and state["title"] != "Untitled":  # metadata comes from the PDF, never from the LLM
         card["title"] = state["title"]
+    card["domain"] = card.get("domain") if card.get("domain") in prompts.DOMAINS else "general"
     ctx.trace.emit("node_end", "summarizer", card=card)
     return {"card": card}
 
@@ -119,8 +123,8 @@ async def orchestrate(state: ReviewState, ctx: RunContext) -> ReviewState:
         lessons = ctx.lessons_store.retrieve(json.dumps(state["card"])[:800], state["paper_id"])
     raw = await ctx.ask("orchestrator", "orchestrator",
                         prompts.orchestrator_user(state["card"], state.get("user_focus", ""), lessons,
-                                                  ctx.settings.use_l3))
-    plan = _enrich_plan(_normalise_plan(raw.get("plan")), state["card"])
+                                                  ctx.settings.use_l3, _domain(state["card"])))
+    plan = _enrich_plan(_normalise_plan(raw.get("plan"), _domain(state["card"])), state["card"])
     graph_facts = ""
     if ctx.settings.use_graph and raw.get("graph_lookup", True):
         graph_facts = await _graph_facts(ctx, Path(state["paper_path"]).stem)
@@ -166,7 +170,7 @@ async def critic(task: dict, ctx: RunContext) -> ReviewState:
         graph = "\n".join(x for x in (graph, await _artifact_facts(ctx, agent, task.get("code_urls", []))) if x)
     raw = await ctx.ask("critic", agent, prompts.critic_user(
         axis, task["card"], window.render(), graph, task["lessons"], task["feedback"], task.get("previous"),
-        ctx.settings.use_l3))
+        ctx.settings.use_l3, _domain(task["card"])))
     crit = _clean_critique(raw, axis, rnd, window)
     ctx.trace.emit("critique", agent, **{k: v for k, v in crit.items() if k != "window_ids"})
     ctx.trace.emit("node_end", agent, round=rnd, evidence=len(window), evidence_tokens=window.tokens)
@@ -177,17 +181,19 @@ async def evaluate(state: ReviewState, ctx: RunContext) -> ReviewState:
     rnd = state["round"]
     ctx.trace.emit("node_start", "evaluator", round=rnd)
     current = [c for c in state["critiques"] if c["round"] == rnd]
+    guides = prompts.axis_guides(_domain(state.get("card", {})))
     to_judge = []
     for c in current:
         c["quotes"] = await _quotes(ctx, state["paper_id"], c["evidence_ids"])
         c["grounded"], c["ground_issue"] = _grounding(c)
         if c["grounded"]:
-            to_judge.append({"id": c["axis"], "axis": c["axis"], "axis_definition": prompts.AXIS_GUIDE[c["axis"]],
+            to_judge.append({"id": c["axis"], "axis": c["axis"], "axis_definition": guides[c["axis"]],
                              "weakness": c["weakness"],
                              "cited_sentences": [q["text"] for q in c["quotes"]], "question": c["question"]})
     judged = {}
     if to_judge:
-        raw = await ctx.ask("evaluator", "evaluator", prompts.evaluator_user(to_judge), max_tokens=600)
+        raw = await ctx.ask("evaluator", "evaluator", prompts.evaluator_user(to_judge), max_tokens=600,
+                            temperature=ctx.settings.judge_temperature)
         judged = {s.get("id"): s for s in raw.get("scores", []) if isinstance(s, dict)}
     best, feedback, retry = dict(state.get("best", {})), {}, []
     for c in current:
@@ -215,7 +221,22 @@ async def evaluate(state: ReviewState, ctx: RunContext) -> ReviewState:
 
 
 def route_after_evaluate(state: ReviewState) -> list[Send] | str:
-    return dispatch(state) if state.get("pending") else "synthesize"
+    return dispatch(state) if state.get("pending") else "meta_review"
+
+
+async def meta_review(state: ReviewState, ctx: RunContext) -> ReviewState:
+    """Overall 1-10 assessment of the paper. Separate from the critique scores, which grade the critiques."""
+    if not ctx.settings.paper_score:
+        return {"assessment": {}}
+    ctx.trace.emit("node_start", "meta_reviewer")
+    critiques = [state["best"][a] for a in AXES if a in state.get("best", {})]
+    raw = await ctx.ask("meta_reviewer", "meta_reviewer", prompts.meta_reviewer_user(
+        state["card"], state["first_pages"][:ctx.settings.first_pages_chars], critiques, ctx.settings.use_l3),
+        max_tokens=1200, temperature=ctx.settings.judge_temperature)
+    assessment = _clean_assessment(raw)
+    ctx.trace.emit("node_end", "meta_reviewer", overall=assessment.get("overall"),
+                   dimensions=assessment.get("dimensions"))
+    return {"assessment": assessment}
 
 
 async def synthesize(state: ReviewState, ctx: RunContext) -> ReviewState:
@@ -229,6 +250,7 @@ async def synthesize(state: ReviewState, ctx: RunContext) -> ReviewState:
         "critiques": [_public(c) for c in critiques],
         "debate_questions": [c["question"] for c in ranked[:3] if c["question"]],
         "rounds": state["round"], "accepted": sum(c["accepted"] for c in critiques),
+        "no_issue": sum(bool(c.get("no_issue")) for c in critiques), "assessment": state.get("assessment", {}),
         "attempts": len(state["critiques"]), "guardrail_flags": state.get("flags", []),
     }
     if ctx.lessons_store is not None and ctx.settings.use_memory:
@@ -240,7 +262,12 @@ async def synthesize(state: ReviewState, ctx: RunContext) -> ReviewState:
 
 # ------------------------------------------------------------------ helpers
 
-def _normalise_plan(raw: Any) -> dict[str, dict]:
+def _domain(card: dict) -> str:
+    domain = card.get("domain") if isinstance(card, dict) else None
+    return domain if domain in prompts.DOMAINS else "general"
+
+
+def _normalise_plan(raw: Any, domain: str = "coding_agent") -> dict[str, dict]:
     plan = {}
     for item in raw if isinstance(raw, list) else []:
         if isinstance(item, dict) and item.get("axis") in AXES:
@@ -249,7 +276,7 @@ def _normalise_plan(raw: Any) -> dict[str, dict]:
     for axis in AXES:  # fall back to the axis description so no worker starts without queries
         entry = plan.setdefault(axis, {"priority": "medium", "queries": []})
         if not entry["queries"]:
-            entry["queries"] = [prompts.AXIS_GUIDE[axis].split("(")[1].rstrip(")")[:120]]
+            entry["queries"] = [prompts.axis_guides(domain)[axis].split("(")[1].rstrip(")")[:120]]
     return plan
 
 
@@ -263,13 +290,15 @@ def _enrich_plan(plan: dict[str, dict], card: dict) -> dict[str, dict]:
         return [str(x)[:60] for x in card.get(key, []) if isinstance(x, (str, int))][:3]
 
     benchmarks, baselines, models = names("benchmarks"), names("baselines"), names("models")
+    coding = _domain(card) == "coding_agent"
     extra = {
-        "assumptions": ["environment setup docker dependencies test suite", "we assume"],
+        "assumptions": (["environment setup docker dependencies test suite"] if coding
+                        else ["environment setup simulated idealised setting"]) + ["we assume"],
         "fairness": [f"compared with {b} results" for b in baselines] + ["same model budget cost comparison"],
         "data_reliability": [f"{b} dataset contamination leakage training data" for b in benchmarks]
                             + ["evaluation set size filtered subset"],
-        "generalizability": [f"{b} programming language repositories" for b in benchmarks]
-                            + ["threats to validity limitations"],
+        "generalizability": [f"{b} programming language repositories" if coding else f"{b} other domains tasks"
+                             for b in benchmarks] + ["threats to validity limitations"],
         "reproducibility": ["repeat experiments randomness runs variance", "code released replication package"]
                            + [f"{m} version" for m in models[:1]],
     }
@@ -365,3 +394,22 @@ def _as_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _clean_assessment(raw: dict) -> dict:
+    """Keep only well-formed scores in 1-10; an empty or malformed answer gives an empty assessment."""
+    def score(value: Any) -> float | None:
+        v = _as_float(value, -1.0)
+        return round(v, 1) if 1.0 <= v <= 10.0 else None
+
+    dims = raw.get("dimensions") if isinstance(raw.get("dimensions"), dict) else {}
+    dimensions = {d: s for d in prompts.META_DIMENSIONS if (s := score(dims.get(d))) is not None}
+    overall = score(raw.get("overall"))
+    if overall is None:
+        return {}
+    strengths = [str(x)[:200] for x in raw.get("strengths", []) if isinstance(x, str)][:4] \
+        if isinstance(raw.get("strengths"), list) else []
+    confidence = _as_float(raw.get("confidence"), 0.0)
+    return {"overall": overall, "dimensions": dimensions, "strengths": strengths,
+            "confidence": confidence if 1 <= confidence <= 5 else None,
+            "justification": str(raw.get("justification", ""))[:800]}

@@ -86,10 +86,10 @@ def pdf_ingest(path: str) -> str:
     tag = f"g{int(settings.use_l1)}{int(settings.use_l2)}-{embedder.name if embedder else 'none'}"
     index = PaperIndex(chunks, embedder, settings.cache_dir / f"{paper.paper_id}-{tag}.npy")
     _papers[paper.paper_id] = {"sentences": {s.sid: s for s in sentences}, "index": index}
-    first = [s.text for s in sentences if s.page <= 2][:60]
+    first = [s.text for s in sentences if s.page <= 3][:250]  # callers cut it to their own budget
     return json.dumps({"paper_id": paper.paper_id, "title": paper.title, "num_pages": paper.num_pages,
                        "num_sentences": len(sentences), "num_chunks": len(chunks),
-                       "first_pages": " ".join(first)[:5000], "guardrail_flags": flags,
+                       "first_pages": " ".join(first)[:20000], "guardrail_flags": flags,
                        "code_urls": (urls := _code_urls(pages, Path(path).stem)),
                        "own_repo": _own_repo(urls, Path(path).stem)})
 
