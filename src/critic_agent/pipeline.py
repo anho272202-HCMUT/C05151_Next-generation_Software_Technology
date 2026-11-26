@@ -7,7 +7,9 @@ ingest -> summarize -> orchestrate -> [critic x5 in parallel] -> evaluate -> (re
 from __future__ import annotations
 
 import json
+import re
 import time
+import unicodedata
 import uuid
 from functools import partial
 from pathlib import Path
@@ -25,6 +27,13 @@ from .llm import build_llm
 from .report import render_markdown
 
 BASELINE_TOKEN_BUDGET = 3000
+
+
+def run_slug(paper: str) -> str:
+    """URL- and file-safe part of a run id from a PDF name ('Lightman et al. — PRM (ICLR 2024).pdf' ->
+    'lightman-et-al-prm-iclr-2024'); run ids become file names under web/data/runs/ and URLs on the Explorer."""
+    text = unicodedata.normalize("NFKD", Path(paper).stem).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")[:60] or "paper"
 
 
 def build_graph(ctx: RunContext):
@@ -54,7 +63,7 @@ def _lessons(settings: Settings) -> LessonStore | None:
 async def run_review(paper: str, settings: Settings, *, seed: int = 0, focus: str = "",
                      approver: Approver = deny_all, run_id: str | None = None,
                      listener: Listener | None = None) -> dict:
-    run_id = run_id or f"{Path(paper).stem}-s{seed}-{uuid.uuid4().hex[:6]}"
+    run_id = run_id or f"{run_slug(paper)}-s{seed}-{uuid.uuid4().hex[:6]}"
     run_dir = settings.runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     tracker, trace = CostTracker(), Trace(run_id, listener)
@@ -73,7 +82,7 @@ async def run_review(paper: str, settings: Settings, *, seed: int = 0, focus: st
 
 async def run_baseline(paper: str, settings: Settings, *, seed: int = 0, run_id: str | None = None) -> dict:
     """Simpler configuration: one LLM call over the paper's first sentences; no tools, planning or reflection."""
-    run_id = run_id or f"baseline-{Path(paper).stem}-s{seed}-{uuid.uuid4().hex[:6]}"
+    run_id = run_id or f"baseline-{run_slug(paper)}-s{seed}-{uuid.uuid4().hex[:6]}"
     run_dir = settings.runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     tracker, trace = CostTracker(), Trace(run_id)

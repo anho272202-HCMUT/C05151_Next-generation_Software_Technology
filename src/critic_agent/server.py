@@ -21,6 +21,7 @@ from .pipeline import run_review
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 app = FastAPI(title="Critic-Agent Explorer")
+HEARTBEAT_S = 15  # SSE comment interval: tunnels and proxies may close a stream that stays silent too long
 _run_lock = asyncio.Lock()  # one live run at a time: a local model cannot serve two reviews at once
 
 
@@ -70,7 +71,11 @@ async def run(paper: str, seed: int = 1) -> StreamingResponse:
         task = asyncio.create_task(worker())
         try:
             while True:
-                event = await queue.get()
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_S)
+                except asyncio.TimeoutError:  # one LLM call can take minutes; keep proxies from closing the stream
+                    yield ": ping\n\n"
+                    continue
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 if event["type"] in ("final", "error"):
                     break

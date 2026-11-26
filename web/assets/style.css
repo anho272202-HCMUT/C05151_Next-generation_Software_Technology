@@ -153,3 +153,10 @@ textarea { width: 100%; font: inherit; padding: 10px; border-radius: 10px; borde
 .guard-controls select { flex: 1; min-width: 0; }
 td.num { text-align: center; font-variant-numeric: tabular-nums; }
 svg .band-caption { font-size: 11px; fill: var(--muted, #888); letter-spacing: .3px; }
+.paper-score { display: flex; gap: 16px; align-items: flex-start; background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; margin: 8px 0 12px; }
+.paper-score .big { font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
+.paper-score .big small { font-size: 15px; color: var(--muted); font-weight: 500; }
+.paper-score .body { min-width: 0; flex: 1; font-size: 14px; }
+.paper-score .dims { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.paper-score ul { margin: 4px 0; padding-left: 18px; }
+@media (max-width: 560px) { .paper-score { flex-direction: column; gap: 8px; } }

@@ -1,13 +1,16 @@
 """Export recorded runs, the paper graph, evaluation results and system metadata for the web Explorer.
 
 uv run python scripts/export_web_data.py
+uv run python scripts/export_web_data.py --runs-dir <Drive>/CO5151_Critic/runs --add   # add runs made on Colab
 
-Picks, per paper, the seed-1 evaluation runs (Full and baseline) when they exist, otherwise the latest CLI run.
-Writes web/data/{index,system,graph,summary}.json and web/data/runs/<run_id>.json.
+Picks, per paper, the seed-1 evaluation runs (Full and baseline) when they exist, otherwise the latest CLI run
+(including live runs from the web server). Writes web/data/{index,system,graph,summary}.json and
+web/data/runs/<run_id>.json. With --add, the runs are merged into the published ones instead of replacing them.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -40,7 +43,8 @@ def _candidates(runs_dir: Path) -> dict[tuple[str, str], Path]:
         m = re.match(r"eval-(full|baseline)-s1-(.+)", d.name)
         if m and (d / "output.json").exists():
             picks[(m.group(2), m.group(1))] = d
-    for d in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):  # newest first
+    dirs = [d for base in (runs_dir, runs_dir / "live") if base.is_dir() for d in base.iterdir() if d.is_dir()]
+    for d in sorted(dirs, key=lambda p: p.stat().st_mtime, reverse=True):  # newest first
         if not (d / "output.json").exists() or d.name.startswith(("eval", "smoke")):
             continue
         mode = "baseline" if d.name.startswith("baseline-") else "full"
@@ -60,25 +64,37 @@ def _trim(value):
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--runs-dir", type=Path, help="default: RUNS_DIR / runs/")
+    ap.add_argument("--add", action="store_true", help="merge into the published runs instead of replacing them")
+    args = ap.parse_args()
     settings = load_settings()
+    runs_dir = (args.runs_dir or settings.runs_dir).expanduser()
     runs_out = WEB_DATA / "runs"
-    index = []
-    candidates = _candidates(settings.runs_dir) if settings.runs_dir.exists() else {}
-    if candidates:  # without local runs keep the recorded traces that are committed in web/data/
+    index_path = WEB_DATA / "index.json"
+    index = json.loads(index_path.read_text()) if args.add and index_path.exists() else []
+    candidates = _candidates(runs_dir) if runs_dir.exists() else {}
+    if candidates and not args.add:  # without local runs keep the recorded traces that are committed in web/data/
         if runs_out.exists():
             shutil.rmtree(runs_out)
-        runs_out.mkdir(parents=True)
+    runs_out.mkdir(parents=True, exist_ok=True)
     for (stem, mode), run_dir in sorted(candidates.items()):
         run = _load_run(run_dir)
         if run is None:
             continue
         f = run["final"]
         (runs_out / f"{run['run_id']}.json").write_text(json.dumps(_trim(run), ensure_ascii=False))
+        for old in [r for r in index if (r["paper"], r["mode"]) == (stem, mode)]:  # --add: the new run replaces it
+            index.remove(old)
+            if old["run_id"] != run["run_id"]:
+                (runs_out / f"{old['run_id']}.json").unlink(missing_ok=True)
         index.append({"run_id": run["run_id"], "paper": stem, "mode": mode, "title": f.get("title"),
                       "seed": f.get("seed"), "accepted": f.get("accepted"), "rounds": f.get("rounds"),
                       "latency_s": f.get("wall_latency_s"), "llm_calls": f["cost"]["calls"],
                       "tokens": f["cost"]["input_tokens"] + f["cost"]["output_tokens"],
-                      "events": len(run["events"])})
+                      "events": len(run["events"]),
+                      "paper_score": (f.get("assessment") or {}).get("overall"),
+                      "domain": (f.get("card") or {}).get("domain"), "model": (f.get("config") or {}).get("model")})
     if candidates:
         (WEB_DATA / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
 
@@ -100,8 +116,9 @@ def main() -> None:
         "guardrail": {"rules": [{"id": r.id, "category": r.category, "gated": r.gated} for r in RULES]},
         "model": settings.llm_model,
     }
-    (WEB_DATA / "system.json").write_text(json.dumps(system, indent=1, ensure_ascii=False))
-    print(f"exported {len(index)} runs -> {WEB_DATA}")
+    if not args.add:  # added runs carry their own model name (index.json); keep the published system description
+        (WEB_DATA / "system.json").write_text(json.dumps(system, indent=1, ensure_ascii=False))
+    print(f"exported {len(candidates)} runs from {runs_dir}; {len(index)} runs published -> {WEB_DATA}")
 
 
 if __name__ == "__main__":

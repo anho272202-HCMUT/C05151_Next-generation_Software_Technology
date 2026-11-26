@@ -4,6 +4,8 @@
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const AXIS_VI = {assumptions: "Giả định ngầm", fairness: "Công bằng khi so sánh", data_reliability: "Độ tin cậy dữ liệu",
                    generalizability: "Tính tổng quát", reproducibility: "Tính tái lập"};
+  const DIM_VI = {soundness: "Độ chặt chẽ", contribution: "Đóng góp", clarity: "Độ rõ ràng", significance: "Tầm quan trọng",
+                  reproducibility: "Tính tái lập"};
   const LEVEL_VI = {"read-only": "chỉ đọc", "reversible-write": "ghi hoàn tác được",
                     "irreversible-write": "ghi không hoàn tác", "code-execution": "thực thi mã"};
   const PRICE_IN = 0.15 / 1e6, PRICE_OUT = 0.6 / 1e6;  // gpt-4o-mini reference pricing
@@ -234,12 +236,24 @@
     const f = run.final;
     if (!s.end || !f) { $("#final-report").innerHTML = `<p class="muted">Báo cáo hiện ra khi lượt chạy kết thúc.</p>`; return; }
     const qs = (f.debate_questions || []).map(q => `<li>${esc(q)}</li>`).join("");
-    $("#final-report").innerHTML = `<h3>${esc(f.title)}</h3>
+    $("#final-report").innerHTML = `<h3>${esc(f.title)}</h3>${paperScoreHTML(f.assessment)}
       <p>${f.mode === "baseline" ? "Baseline 1 prompt (không có Evaluator)" : `Được chấp nhận: <b>${f.accepted}/5</b> · số vòng: ${f.rounds} · lượt thử: ${f.attempts}`}</p>
-      ${f.critiques.map(c => `<div class="crit"><b>${AXIS_VI[c.axis]}</b> <span class="pill">${c.accepted ? "chấp nhận" : c.grounded ? "có trích dẫn" : "chưa kiểm chứng"}${c.score != null ? " · " + c.score + "/10" : ""}</span>
+      ${f.critiques.map(c => `<div class="crit"><b>${AXIS_VI[c.axis]}</b> <span class="pill">${c.no_issue ? "không thấy điểm yếu đáng kể" : (c.accepted ? "chấp nhận" : c.grounded ? "có trích dẫn" : "chưa kiểm chứng") + (c.score != null ? " · critique " + c.score + "/10" : "")}</span>
         <p>${esc(c.weakness)}</p>${(c.quotes || []).map(q => `<blockquote><code>${esc(q.id)}, tr.${q.page}</code> ${esc(q.text)}</blockquote>`).join("")}
         ${c.question ? `<p class="muted">Câu hỏi tranh luận: ${esc(c.question)}</p>` : ""}</div>`).join("")}
       ${qs ? `<h4>3 câu hỏi tranh luận hàng đầu</h4><ol>${qs}</ol>` : ""}`;
+  }
+
+  // Paper score of the Meta-reviewer; the per-axis numbers grade the critiques, not the paper
+  function paperScoreHTML(a) {
+    if (!a || a.overall == null) return "";
+    const dims = Object.entries(a.dimensions || {}).map(([d, v]) => `<span class="pill">${esc(DIM_VI[d] || d)} ${v}</span>`).join("");
+    const strengths = (a.strengths || []).map(x => `<li>${esc(x)}</li>`).join("");
+    return `<div class="paper-score"><div class="big">${a.overall}<small>/10</small></div><div class="body">
+      <b>Điểm bài báo (Meta-reviewer, thang reviewer ICLR/NeurIPS)</b>${a.confidence ? ` <span class="muted small">· độ tin cậy ${a.confidence}/5</span>` : ""}
+      ${dims ? `<div class="dims">${dims}</div>` : ""}${strengths ? `<div class="small">Điểm mạnh:</div><ul class="small">${strengths}</ul>` : ""}
+      ${a.justification ? `<div class="small muted">${esc(a.justification)}</div>` : ""}
+      <div class="small muted">Điểm “critique x/10” ở từng trục bên dưới là điểm của lời phản biện, không phải điểm bài báo.</div></div></div>`;
   }
 
   function delayFor(i) {
@@ -281,7 +295,7 @@
     Arch.render($("#demo-svg"));
     const sel = $("#run-select");
     const idx = data.index || [];
-    const label = r => `${r.paper} · ${r.mode === "full" ? "Full multi-agent" : "Baseline 1 prompt"} · ${r.latency_s?.toFixed(0)}s · ${r.llm_calls} lời gọi LLM`;
+    const label = r => `${r.title || r.paper} · ${r.mode === "full" ? "Full multi-agent" : "Baseline 1 prompt"}${r.paper_score != null ? " · điểm bài " + r.paper_score + "/10" : ""}${r.model ? " · " + r.model : ""} · ${r.latency_s?.toFixed(0)}s`;
     sel.innerHTML = idx.map(r => `<option value="${r.run_id}">${esc(label(r))}</option>`).join("");
     sel.addEventListener("change", () => loadRun(sel.value));
     $("#btn-play").addEventListener("click", () => player.playing ? pause() : play());
@@ -301,15 +315,17 @@
     const health = await getJSON("api/health");
     if (!health) return;
     const papers = await getJSON("api/papers") || [];
-    $("#live-paper").innerHTML = papers.map(p => `<option>${esc(p)}</option>`).join("");
+    // explicit value: an <option>'s text is whitespace-trimmed, and file names may start with a space
+    $("#live-paper").innerHTML = papers.map(p => `<option value="${esc(p)}">${esc(p.trim())}</option>`).join("");
     $("#live-box").classList.remove("hidden");
+    $("#model-name").textContent = health.model;
     $("#live-start").addEventListener("click", () => {
       pause();
       player.run = {run_id: "live", events: [], final: null};
       player.live = true;
       renderAt(-1);
       $("#live-start").disabled = true;
-      $("#narration").innerHTML = "Đang khởi động lượt chạy LIVE trên máy của bạn…";
+      $("#narration").innerHTML = `Đang khởi động lượt chạy LIVE trên server (model ${esc(health.model)}). Một bài có thể mất nhiều phút; giữ tab này mở.`;
       const src = new EventSource(`api/run?paper=${encodeURIComponent($("#live-paper").value)}&seed=1`);
       src.onmessage = msg => {
         const e = JSON.parse(msg.data);
