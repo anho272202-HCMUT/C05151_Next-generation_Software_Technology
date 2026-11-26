@@ -71,6 +71,8 @@ async def test_full_review_end_to_end(mock_settings):
     assert {c["axis"] for c in final["critiques"]} == {"assumptions", "fairness", "data_reliability",
                                                        "generalizability", "reproducibility"}
     assert final["cost"]["calls"] >= 8
+    assert final["card"]["domain"] == "coding_agent" and final["assessment"]["overall"] == 7.0
+    assert "Paper assessment" in (run_dir / "report.md").read_text()
 
 
 async def test_baseline_single_call(mock_settings):

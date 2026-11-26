@@ -1,0 +1,60 @@
+{
+  "_doc": "Reference scores for scripts/calibrate.py. reference_score = mean reviewer rating on OpenReview (1-10) where the paper has one; null otherwise. Fill these from the OpenReview pages, do not guess. Add weaker papers too (e.g. rejected ICLR submissions with their ratings): a calibration set of only strong papers cannot tell a good scorer from one that gives 8 to everything.",
+  "papers": [
+    {
+      "file": "01_ AgentBench_ICLR2024.pdf",
+      "venue": "ICLR 2024",
+      "reference_score": null
+    },
+    {
+      "file": "02_ GAIA_ICLR2024.pdf",
+      "venue": "ICLR 2024",
+      "reference_score": null
+    },
+    {
+      "file": "03_ WebArena_ICLR2024.pdf",
+      "venue": "ICLR 2024",
+      "reference_score": null
+    },
+    {
+      "file": "04_tbench_2024.pdf",
+      "venue": "2024",
+      "reference_score": null
+    },
+    {
+      "file": "05_AIAgentsThatMatter_2024.pdf",
+      "venue": "2024",
+      "reference_score": null
+    },
+    {
+      "file": "06_JudgingLLMasaJudge_NeurIPS2023.pdf",
+      "venue": "NeurIPS 2023",
+      "reference_score": null
+    },
+    {
+      "file": "DeepSeek-AI — DeepSeek-R1 (2025).pdf",
+      "venue": "2025",
+      "reference_score": null
+    },
+    {
+      "file": "Lightman et al. — Process reward models (ICLR 2024).pdf",
+      "venue": "ICLR 2024",
+      "reference_score": null
+    },
+    {
+      "file": "Ouyang et al. — RLHF (NeurIPS 2022).pdf",
+      "venue": "NeurIPS 2022",
+      "reference_score": null
+    },
+    {
+      "file": "Pan et al. — SWE-Gym (2024).pdf",
+      "venue": "2024",
+      "reference_score": null
+    },
+    {
+      "file": "Shao et al. — GRPO : DeepSeekMath (2024).pdf",
+      "venue": "2024",
+      "reference_score": null
+    }
+  ]
+}

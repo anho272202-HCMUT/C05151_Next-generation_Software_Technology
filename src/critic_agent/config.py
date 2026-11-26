@@ -12,6 +12,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 AXES = ("assumptions", "fairness", "data_reliability", "generalizability", "reproducibility")
 
+HOSTED_PROVIDERS = ("anthropic", "openai")
+# Hosted models have a 128k-1M token context, so the small-model budgets (sized for qwen2.5:3b with num_ctx=8192)
+# would hide most of a 10-40k-word paper from the critics. Applied only when the matching env var is not set.
+HOSTED_BUDGETS = {"evidence_token_budget": 8000, "search_k": 8, "first_pages_chars": 16000}
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -22,6 +27,9 @@ class Settings:
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     temperature: float = 0.7
+    judge_temperature: float = 0.0  # Evaluator and Meta-reviewer: grading should not depend on sampling noise
+    effort: str = "high"  # hosted reasoning models (Anthropic output_config.effort): low | medium | high | xhigh | max
+    hosted_min_max_tokens: int = 16000  # thinking counts against max_tokens on hosted reasoning models
     num_ctx: int = 8192
     papers_dir: Path = PROJECT_ROOT / "data" / "papers"
     runs_dir: Path = PROJECT_ROOT / "runs"
@@ -42,6 +50,12 @@ class Settings:
     allow_code_execution: bool = False  # execute_code_in_sandbox is off unless explicitly enabled
     search_k: int = 4
     evidence_token_budget: int = 1800  # per critic worker (short-term memory window)
+    first_pages_chars: int = 4000  # opening text given to the Summarizer and the Meta-reviewer
+    paper_score: bool = True  # Meta-reviewer: overall 1-10 assessment of the paper (separate from critique scores)
+
+    @property
+    def hosted(self) -> bool:
+        return self.llm_provider in HOSTED_PROVIDERS
 
     @property
     def use_l1(self) -> bool:
@@ -78,10 +92,20 @@ def _path(name: str) -> Path | None:
     return Path(raw) if raw else None
 
 
+def _int(name: str) -> int | None:
+    raw = os.getenv(name)
+    return int(raw) if raw else None
+
+
+def _float(name: str) -> float | None:
+    raw = os.getenv(name)
+    return float(raw) if raw else None
+
+
 def load_settings() -> Settings:
     load_dotenv(PROJECT_ROOT / ".env")
     base = Settings()
-    return base.with_overrides(
+    settings = base.with_overrides(
         llm_provider=os.getenv("LLM_PROVIDER"),
         llm_model=os.getenv("LLM_MODEL"),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL"),
@@ -97,4 +121,16 @@ def load_settings() -> Settings:
         l1_parser=_opt_bool("CRITIC_L1"), l2_sanitizer=_opt_bool("CRITIC_L2"), l3_spotlight=_opt_bool("CRITIC_L3"),
         retrieval=os.getenv("CRITIC_RETRIEVAL"),
         allow_code_execution=_bool("CRITIC_ALLOW_CODE", base.allow_code_execution),
+        effort=os.getenv("LLM_EFFORT"),
+        num_ctx=_int("OLLAMA_NUM_CTX"),  # e.g. 16384 for a 14B model on a 16 GB GPU
+        judge_temperature=_float("CRITIC_JUDGE_TEMPERATURE"),
+        paper_score=_bool("CRITIC_PAPER_SCORE", base.paper_score),
+        evidence_token_budget=_int("CRITIC_EVIDENCE_TOKENS"),
+        search_k=_int("CRITIC_SEARCH_K"),
+        first_pages_chars=_int("CRITIC_FIRST_PAGES_CHARS"),
     )
+    if settings.hosted:  # larger budgets for large-context models, unless set explicitly above
+        env = {"evidence_token_budget": "CRITIC_EVIDENCE_TOKENS", "search_k": "CRITIC_SEARCH_K",
+               "first_pages_chars": "CRITIC_FIRST_PAGES_CHARS"}
+        settings = settings.with_overrides(**{k: v for k, v in HOSTED_BUDGETS.items() if not os.getenv(env[k])})
+    return settings

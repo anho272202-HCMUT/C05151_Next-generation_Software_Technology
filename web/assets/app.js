@@ -54,6 +54,7 @@
     if (["ingest", "summarizer", "orchestrator", "evaluator", "synthesizer", "gateway"].includes(e.agent)) return e.agent;
     if (e.agent?.startsWith("critic:")) return e.agent;
     if (e.agent === "baseline") return "summarizer";
+    if (e.agent === "meta_reviewer") return "synthesizer";  // drawn inside the Synthesizer box of the diagram
     return null;
   }
 
@@ -110,6 +111,7 @@
         if (ag.startsWith("critic:")) return `<b>Critic ${esc(Arch.AXIS_LABEL[ag.slice(7)])}</b> (vòng ${e.round}) tìm bằng chứng cho trục của mình. Các critic chạy song song nên sự kiện của chúng xen kẽ nhau.`;
         if (ag === "evaluator") return `<b>Evaluator</b> (vòng ${e.round}) kiểm tra tự động các ID trích dẫn bằng <code>get_sentences</code>, rồi LLM chấm điểm mức đúng trục và mức được ủng hộ.`;
         if (ag === "synthesizer") return "<b>Synthesizer</b> chọn critique tốt nhất của mỗi trục, xếp hạng câu hỏi tranh luận và ghi lessons vào bộ nhớ.";
+        if (ag === "meta_reviewer") return "<b>Meta-reviewer</b> cân điểm mạnh của bài với các điểm yếu đã kiểm chứng và chấm bài 1–10 theo thang reviewer ICLR/NeurIPS.";
         return `Bắt đầu ${esc(ag)}.`;
       }
       case "node_end": {
@@ -119,6 +121,7 @@
         if (ag.startsWith("critic:")) return `Critic ${esc(Arch.AXIS_LABEL[ag.slice(7)])} đã gom ${e.evidence} câu bằng chứng (≈${e.evidence_tokens} token, bộ nhớ ngắn hạn).`;
         if (ag === "evaluator") return `Evaluator xong vòng ${e.round}: nhận ${e.accepted}, sẽ thử lại: ${e.retry?.length ? e.retry.join(", ") : "không"}.`;
         if (ag === "synthesizer") return `Tổng hợp xong: <b>${e.accepted}/5</b> critique được chấp nhận sau ${e.rounds} vòng.`;
+        if (ag === "meta_reviewer") return e.overall ? `Điểm bài báo: <b>${e.overall}/10</b>.` : "Meta-reviewer không trả về điểm hợp lệ.";
         return `Kết thúc ${esc(ag)}.`;
       }
       case "llm_call": return `<b>${esc(ag)}</b> gọi LLM: ${e.input_tokens} token vào, ${e.output_tokens} token ra, ${e.latency_s}s.`;
