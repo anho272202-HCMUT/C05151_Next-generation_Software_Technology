@@ -69,6 +69,7 @@ async def run(paper: str, seed: int = 1) -> StreamingResponse:
 
     async def stream():
         task = asyncio.create_task(worker())
+        yield ":" + " " * 2048 + "\n\n"  # padding comment: some proxies hold back the first few KB of a response
         try:
             while True:
                 try:
@@ -82,7 +83,9 @@ async def run(paper: str, seed: int = 1) -> StreamingResponse:
         finally:
             await task
 
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    # no-transform: proxies such as a Cloudflare tunnel may otherwise compress, and therefore buffer, the event stream
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
 
 app.mount("/", StaticFiles(directory=PROJECT_ROOT / "web", html=True), name="web")
