@@ -31,7 +31,7 @@ class ToolPolicy:
 TOOL_POLICY: dict[str, ToolPolicy] = {
     "pdf_ingest": ToolPolicy(Level.READ_ONLY, frozenset({"ingest"}), False,
                              "Parse + sanitise + index a PDF from data/papers/ (only the server's cache is written)"),
-    "search_paper": ToolPolicy(Level.READ_ONLY, frozenset({"summarizer", "orchestrator", "critic"}), False,
+    "search_paper": ToolPolicy(Level.READ_ONLY, frozenset({"summarizer", "orchestrator", "critic", "meta_reviewer"}), False,
                                "Hybrid search over one indexed paper, returns numbered sentences"),
     "get_sentences": ToolPolicy(Level.READ_ONLY, frozenset({"critic", "evaluator", "synthesizer"}), False,
                                 "Return verbatim sentences by id (citation verification)"),

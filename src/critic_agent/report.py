@@ -11,6 +11,16 @@ AXIS_TITLES = {
 }
 
 
+def response_label(r: dict) -> str:
+    """Outcome of the author-response check of one accepted weakness."""
+    if not r.get("accurate", True):
+        return "refuted: the critique misreads the paper"
+    parts = [{"fully": "fully addressed", "partly": "partly addressed"}.get(r.get("addressed"), "not addressed")]
+    if r.get("acknowledged"):
+        parts.append("acknowledged by the authors")
+    return ", ".join(parts)
+
+
 def render_markdown(final: dict) -> str:
     lines = [f"# Critic-Agent review: {final.get('title') or final['paper_id']}", ""]
     if final.get("mode") == "full":
@@ -25,6 +35,9 @@ def render_markdown(final: dict) -> str:
         lines.append(f"**Weakness:** {c['weakness']}")
         for q in c.get("quotes", []):
             lines.append(f"> [{q['id']}, p.{q['page']}] {q['text']}")
+        if c.get("response"):
+            lines.append(f"**Against the rest of the paper:** {response_label(c['response'])}"
+                         + (f" ({c['response']['note']})" if c["response"].get("note") else ""))
         if c.get("question"):
             lines.append(f"**Debate question:** {c['question']}")
         lines.append("")

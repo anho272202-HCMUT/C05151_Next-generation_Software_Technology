@@ -184,6 +184,10 @@ class MockLLM:
         elif agent == "evaluator":
             ids = re.findall(r'"id": "([a-z_]+)"', user)
             out = {"scores": [{"id": i, "score": 8, "supported": True, "feedback": ""} for i in ids]}
+        elif agent == "meta_reviewer" and "paper_context" in user:
+            ids = re.findall(r'"id": "([a-z_]+)"', user)
+            out = {"responses": [{"id": i, "accurate": True, "acknowledged": False, "addressed": "partly",
+                                  "note": "The paper bounds this concern."} for i in ids]}
         elif agent == "meta_reviewer":
             out = {"strengths": ["Evaluates on a real-world benchmark."],
                    "dimensions": {"soundness": 7, "contribution": 7, "clarity": 8, "significance": 7,

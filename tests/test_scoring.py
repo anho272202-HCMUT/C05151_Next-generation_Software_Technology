@@ -157,3 +157,59 @@ def test_ollama_thinking_gets_its_own_token_budget(think, sent, budget):
     off._client = _FakeHttp()
     asyncio.run(off.complete("s", "u", agent="a"))
     assert "format" not in off._client.bodies[0]
+
+
+def test_clean_response_defaults_keep_the_weakness():
+    from critic_agent.agents import _clean_response
+    assert _clean_response({}) == {"accurate": True, "acknowledged": False, "addressed": "no", "note": ""}
+    assert _clean_response({"accurate": False, "addressed": "maybe"})["accurate"] is False
+    assert _clean_response({"addressed": "fully", "acknowledged": True})["addressed"] == "fully"
+
+
+def test_meta_prompt_marks_refuted_addressed_and_acknowledged_weaknesses():
+    crits = [
+        {"axis": "assumptions", "accepted": True, "severity": "high", "weakness": "Data is synthetic.",
+         "response": {"accurate": False, "acknowledged": False, "addressed": "no", "note": "p3s3 says real issues."}},
+        {"axis": "fairness", "accepted": True, "severity": "high", "weakness": "Training sets differ.",
+         "response": {"accurate": True, "acknowledged": True, "addressed": "partly", "note": "p8s9."}},
+        {"axis": "reproducibility", "accepted": True, "severity": "medium", "weakness": "No scripts."},
+    ]
+    text = prompts.meta_reviewer_user({"title": "T"}, "We propose X.", crits, True)
+    assert "REFUTED" in text and "partly addressed in the paper; acknowledged by the authors" in text
+    assert "[VERIFIED, severity medium]: No scripts." in text
+    assert "number of weaknesses says nothing" in text
+
+
+def test_evaluator_prompt_rejects_misreadings_and_reversed_arguments():
+    text = prompts.evaluator_user([{"id": "fairness"}])
+    assert "contradict" in text and "favours the baselines" in text
+
+
+class _SearchGateway:
+    def __init__(self):
+        self.calls = []
+
+    async def call(self, agent, tool, args):
+        self.calls.append((agent, tool))
+        return [{"sentences": [{"id": "p1s1", "text": "Cited."}, {"id": "p9s2", "text": "We control for this."}]}]
+
+
+def test_meta_review_checks_accepted_weaknesses_against_the_paper(tmp_path):
+    settings = Settings(llm_provider="mock", runs_dir=tmp_path)
+    tracker = CostTracker()
+    gw = _SearchGateway()
+    ctx = RunContext(settings, MockLLM(tracker), gw, tracker, Trace("t"), seed=1)
+    crit = {"axis": "fairness", "accepted": True, "severity": "high", "weakness": "Baselines get less compute.",
+            "evidence_ids": ["p1s1"], "quotes": [{"id": "p1s1", "text": "Cited."}]}
+    rejected = {"axis": "assumptions", "accepted": False, "weakness": "x", "evidence_ids": []}
+    state = {"card": {"title": "T"}, "first_pages": "We propose X.", "paper_id": "p",
+             "best": {"fairness": crit, "assumptions": rejected}}
+    out = asyncio.run(meta_review(state, ctx))
+    assert gw.calls == [("meta_reviewer", "search_paper")]  # only the accepted weakness is checked
+    assert crit["response"]["addressed"] == "partly" and "response" not in rejected
+    assert out["assessment"]["overall"] == 7.0
+
+
+def test_meta_reviewer_may_search_the_paper():
+    from critic_agent.permissions import TOOL_POLICY
+    assert "meta_reviewer" in TOOL_POLICY["search_paper"].agents

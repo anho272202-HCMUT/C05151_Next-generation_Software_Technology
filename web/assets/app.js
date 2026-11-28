@@ -113,7 +113,7 @@
         if (ag.startsWith("critic:")) return `<b>Critic ${esc(Arch.AXIS_LABEL[ag.slice(7)])}</b> (vòng ${e.round}) tìm bằng chứng cho trục của mình. Các critic chạy song song nên sự kiện của chúng xen kẽ nhau.`;
         if (ag === "evaluator") return `<b>Evaluator</b> (vòng ${e.round}) kiểm tra tự động các ID trích dẫn bằng <code>get_sentences</code>, rồi LLM chấm điểm mức đúng trục và mức được ủng hộ.`;
         if (ag === "synthesizer") return "<b>Synthesizer</b> chọn critique tốt nhất của mỗi trục, xếp hạng câu hỏi tranh luận và ghi lessons vào bộ nhớ.";
-        if (ag === "meta_reviewer") return "<b>Meta-reviewer</b> cân điểm mạnh của bài với các điểm yếu đã kiểm chứng và chấm bài 1–10 theo thang reviewer ICLR/NeurIPS.";
+        if (ag === "meta_reviewer") return "<b>Meta-reviewer</b> đối chiếu từng điểm yếu đã chấp nhận với phần còn lại của bài (bị bác bỏ, đã xử lý, hay tác giả đã tự nêu), rồi cân điểm mạnh với các điểm yếu còn mở và chấm bài 1–10 theo thang reviewer ICLR/NeurIPS.";
         return `Bắt đầu ${esc(ag)}.`;
       }
       case "node_end": {
@@ -135,6 +135,7 @@
         `Critic <b>${esc(Arch.AXIS_LABEL[e.axis])}</b> đề xuất: “${esc(e.weakness)}” · trích dẫn <code>${(e.evidence_ids || []).join(", ") || "—"}</code>` +
         (e.fabricated_ids?.length ? ` · <span class="bad">ID không có trong bằng chứng: ${e.fabricated_ids.join(", ")}</span>` : "");
       case "evaluation": return `Evaluator chấm <b>${esc(Arch.AXIS_LABEL[e.axis])}</b>: ${e.score}/10 · grounded=${e.grounded} · supported=${e.supported} → <b class="${e.accepted ? "good" : "bad"}">${e.accepted ? "CHẤP NHẬN" : "LOẠI"}</b>${e.feedback ? " · feedback: “" + esc(e.feedback) + "”" : ""}`;
+      case "author_response": return `<b>Đối chiếu</b> điểm yếu ${esc(Arch.AXIS_LABEL[e.axis])} với phần còn lại của bài: <b class="${e.accurate === false ? "bad" : ""}">${esc(responseVI(e))}</b>${e.note ? " · " + esc(e.note) : ""}`;
       case "reflection": return `<b>Reflection có mục tiêu</b> (vòng ${e.round}): chỉ chạy lại ${e.axes.map(a => Arch.AXIS_LABEL[a]).join(", ")}, kèm feedback của Evaluator.`;
       case "run_end": return `Hoàn tất sau <b>${e.latency_s}s</b> · ${e.cost.calls} lời gọi LLM · ${e.cost.input_tokens + e.cost.output_tokens} token · chi phí API thực tế $${e.cost.usd} (model local).`;
       default: return esc(e.type);
@@ -142,7 +143,7 @@
   }
 
   const SHORT = {run_start: "bắt đầu", node_start: "▶", node_end: "■", llm_call: "LLM", llm_error: "LLM lỗi", tool_call: "tool",
-                 tool_denied: "CHẶN", guardrail_flag: "guardrail", critique: "critique", evaluation: "chấm", reflection: "reflection",
+                 tool_denied: "CHẶN", guardrail_flag: "guardrail", critique: "critique", evaluation: "chấm", author_response: "đối chiếu", reflection: "reflection",
                  run_end: "kết thúc", tool_error: "tool lỗi"};
 
   function logLine(e) {
@@ -240,8 +241,17 @@
       <p>${f.mode === "baseline" ? "Baseline 1 prompt (không có Evaluator)" : `Được chấp nhận: <b>${f.accepted}/5</b> · số vòng: ${f.rounds} · lượt thử: ${f.attempts}`}</p>
       ${f.critiques.map(c => `<div class="crit"><b>${AXIS_VI[c.axis]}</b> <span class="pill">${c.no_issue ? "không thấy điểm yếu đáng kể" : (c.accepted ? "chấp nhận" : c.grounded ? "có trích dẫn" : "chưa kiểm chứng") + (c.score != null ? " · critique " + c.score + "/10" : "")}</span>
         <p>${esc(c.weakness)}</p>${(c.quotes || []).map(q => `<blockquote><code>${esc(q.id)}, tr.${q.page}</code> ${esc(q.text)}</blockquote>`).join("")}
+        ${c.response ? `<p class="muted">Đối chiếu với phần còn lại của bài: <b>${esc(responseVI(c.response))}</b>${c.response.note ? " · " + esc(c.response.note) : ""}</p>` : ""}
         ${c.question ? `<p class="muted">Câu hỏi tranh luận: ${esc(c.question)}</p>` : ""}</div>`).join("")}
       ${qs ? `<h4>3 câu hỏi tranh luận hàng đầu</h4><ol>${qs}</ol>` : ""}`;
+  }
+
+  // Author-response check of an accepted weakness (refuted / addressed / acknowledged by the paper itself)
+  function responseVI(r) {
+    if (r.accurate === false) return "bác bỏ: critique đọc sai bài";
+    const parts = [{fully: "đã được xử lý trong bài", partly: "được xử lý một phần"}[r.addressed] || "chưa được xử lý"];
+    if (r.acknowledged) parts.push("tác giả đã tự nêu");
+    return parts.join(", ");
   }
 
   // Paper score of the Meta-reviewer; the per-axis numbers grade the critiques, not the paper

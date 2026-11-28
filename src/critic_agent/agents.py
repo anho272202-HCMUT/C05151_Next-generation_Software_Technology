@@ -22,6 +22,8 @@ from .memory import EvidenceWindow
 MAX_LLM_ATTEMPTS = 3
 MIN_WEAKNESS_WORDS = 8
 SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
+RESPONSE_SEARCH_K = 4  # chunks searched per weakness for passages where the authors discuss it
+RESPONSE_MAX_SENTENCES = 12
 GRAPH_AXES = {"fairness", "generalizability", "data_reliability", "reproducibility"}
 
 
@@ -225,11 +227,17 @@ def route_after_evaluate(state: ReviewState) -> list[Send] | str:
 
 
 async def meta_review(state: ReviewState, ctx: RunContext) -> ReviewState:
-    """Overall 1-10 assessment of the paper. Separate from the critique scores, which grade the critiques."""
+    """Overall 1-10 assessment of the paper. Separate from the critique scores, which grade the critiques.
+
+    Before scoring, an author-response step reads, for every accepted weakness, the passages of the paper that
+    discuss it: a weakness the paper refutes, already addresses, or openly acknowledges and bounds must not weigh
+    like an unanswered flaw (a critic only sees the sentences that support its weakness).
+    """
     if not ctx.settings.paper_score:
         return {"assessment": {}}
     ctx.trace.emit("node_start", "meta_reviewer")
     critiques = [state["best"][a] for a in AXES if a in state.get("best", {})]
+    await _author_response(state, ctx, [c for c in critiques if c.get("accepted")])
     raw = await ctx.ask("meta_reviewer", "meta_reviewer", prompts.meta_reviewer_user(
         state["card"], state["first_pages"][:ctx.settings.first_pages_chars], critiques, ctx.settings.use_l3),
         max_tokens=1200, temperature=ctx.settings.judge_temperature)
@@ -237,6 +245,38 @@ async def meta_review(state: ReviewState, ctx: RunContext) -> ReviewState:
     ctx.trace.emit("node_end", "meta_reviewer", overall=assessment.get("overall"),
                    dimensions=assessment.get("dimensions"))
     return {"assessment": assessment}
+
+
+async def _author_response(state: ReviewState, ctx: RunContext, critiques: list[dict]) -> None:
+    """Attach `response` {accurate, acknowledged, addressed, note} to each critique from the paper's own text."""
+    items = []
+    for c in critiques:
+        cited = set(c.get("evidence_ids", []))
+        try:
+            hits = await ctx.gateway.call("meta_reviewer", "search_paper", {
+                "paper_id": state["paper_id"], "query": c["weakness"][:300], "k": RESPONSE_SEARCH_K})
+        except (ToolDenied, ToolError) as exc:
+            ctx.trace.emit("tool_error", "meta_reviewer", error=str(exc)[:200])
+            hits = []
+        context = [f"[{x['id']}] {x['text']}" for h in hits for x in h["sentences"] if x["id"] not in cited]
+        items.append({"id": c["axis"], "weakness": c["weakness"],
+                      "cited_sentences": [q["text"] for q in c.get("quotes", [])],
+                      "paper_context": context[:RESPONSE_MAX_SENTENCES]})
+    if not items:
+        return
+    raw = await ctx.ask("evaluator", "meta_reviewer", prompts.author_response_user(items, ctx.settings.use_l3),
+                        max_tokens=900, temperature=ctx.settings.judge_temperature)
+    verdicts = {v.get("id"): v for v in raw.get("responses", []) if isinstance(v, dict)}
+    for c in critiques:
+        c["response"] = _clean_response(verdicts.get(c["axis"], {}))
+        ctx.trace.emit("author_response", "meta_reviewer", axis=c["axis"], **c["response"])
+
+
+def _clean_response(raw: dict) -> dict:
+    """Unknown or malformed answers keep the weakness as it is (accurate, not acknowledged, not addressed)."""
+    addressed = raw.get("addressed") if raw.get("addressed") in ("no", "partly", "fully") else "no"
+    return {"accurate": raw.get("accurate") is not False, "acknowledged": raw.get("acknowledged") is True,
+            "addressed": addressed, "note": str(raw.get("note", ""))[:300]}
 
 
 async def synthesize(state: ReviewState, ctx: RunContext) -> ReviewState:
@@ -385,7 +425,7 @@ def _rank(c: dict) -> tuple:
 
 def _public(c: dict) -> dict:
     keep = ("axis", "round", "weakness", "evidence_ids", "quotes", "question", "severity", "score", "grounded",
-            "supported", "accepted", "feedback", "no_issue")
+            "supported", "accepted", "feedback", "no_issue", "response")
     return {k: c.get(k) for k in keep}
 
 

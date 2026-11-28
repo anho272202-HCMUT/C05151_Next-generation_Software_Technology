@@ -57,6 +57,11 @@ on-axis, specific, supported by the cited sentences. The **paper score** (1-10, 
 Meta-reviewer's assessment of the paper, weighing its strengths against the verified weaknesses. A strong paper can
 get low critique scores simply because it has few real weaknesses to find.
 
+Before scoring, the Meta-reviewer checks every accepted weakness against the rest of the paper, as an author rebuttal
+would: it searches the passages that discuss the weakness and marks it refuted (the critique misreads the paper),
+fully or partly addressed, and acknowledged by the authors. A critic only sees the sentences that support its
+weakness, so without this step a limitation the paper openly bounds would weigh like a hidden flaw.
+
 The axis definitions depend on the kind of paper, picked by the Summarizer: `coding_agent`, `agent_benchmark`,
 `llm_training`, `llm_evaluation` or `general` (`prompts.DOMAIN_AXIS_GUIDES`).
 
