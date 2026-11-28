@@ -33,22 +33,41 @@ class LLMClient(Protocol):
                        max_tokens: int = 900, temperature: float | None = None) -> LLMResponse: ...
 
 
+def ollama_think_value(raw: str | None) -> bool | str | None:
+    """OLLAMA_THINK -> the `think` field of /api/chat: None (not sent), a bool, or a gpt-oss level."""
+    value = (raw or "").strip().lower()
+    if not value:
+        return None
+    if value in ("low", "medium", "high"):
+        return value
+    return value in ("1", "true", "yes", "on")
+
+
 class OllamaLLM:
     def __init__(self, settings: Settings, tracker: CostTracker):
         self.model = settings.llm_model
         self._url = settings.ollama_base_url.rstrip("/") + "/api/chat"
         self._settings = settings
         self._tracker = tracker
-        self._client = httpx.AsyncClient(timeout=900)
+        self._think = ollama_think_value(settings.ollama_think)
+        # requests queue behind each other on one GPU (OLLAMA_NUM_PARALLEL=1), and thinking makes each one longer
+        self._client = httpx.AsyncClient(timeout=1800)
 
     async def complete(self, system, user, *, agent, seed=None, max_tokens=900, temperature=None):
         start = time.perf_counter()
-        resp = await self._client.post(self._url, json={
-            "model": self.model, "stream": False, "format": "json",
+        thinking = self._think not in (None, False)
+        body = {
+            "model": self.model, "stream": False,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "options": {"temperature": self._settings.temperature if temperature is None else temperature,
-                        "seed": seed, "num_ctx": self._settings.num_ctx, "num_predict": max_tokens},
-        })
+                        "seed": seed, "num_ctx": self._settings.num_ctx,
+                        "num_predict": max_tokens + (self._settings.ollama_think_tokens if thinking else 0)},
+        }
+        if self._settings.ollama_json_format:
+            body["format"] = "json"
+        if self._think is not None:
+            body["think"] = self._think
+        resp = await self._client.post(self._url, json=body)
         resp.raise_for_status()
         data = resp.json()
         latency = time.perf_counter() - start

@@ -31,6 +31,11 @@ class Settings:
     effort: str = "high"  # hosted reasoning models (Anthropic output_config.effort): low | medium | high | xhigh | max
     hosted_min_max_tokens: int = 16000  # thinking counts against max_tokens on hosted reasoning models
     num_ctx: int = 8192
+    # Ollama thinking models (qwen3, gpt-oss, deepseek-r1): "" = do not send `think`; "false"/"true"; gpt-oss takes
+    # "low" | "medium" | "high". Thinking tokens count against num_predict, so they get their own budget on top.
+    ollama_think: str = ""
+    ollama_think_tokens: int = 4096
+    ollama_json_format: bool = True  # Ollama `format: "json"`; turn off for a model whose output breaks under it
     papers_dir: Path = PROJECT_ROOT / "data" / "papers"
     runs_dir: Path = PROJECT_ROOT / "runs"
     cache_dir: Path = PROJECT_ROOT / "runs" / "cache"
@@ -123,6 +128,9 @@ def load_settings() -> Settings:
         allow_code_execution=_bool("CRITIC_ALLOW_CODE", base.allow_code_execution),
         effort=os.getenv("LLM_EFFORT"),
         num_ctx=_int("OLLAMA_NUM_CTX"),  # e.g. 16384 for a 14B model on a 16 GB GPU
+        ollama_think=os.getenv("OLLAMA_THINK"),
+        ollama_think_tokens=_int("OLLAMA_THINK_TOKENS"),
+        ollama_json_format=_bool("OLLAMA_JSON_FORMAT", base.ollama_json_format),
         judge_temperature=_float("CRITIC_JUDGE_TEMPERATURE"),
         paper_score=_bool("CRITIC_PAPER_SCORE", base.paper_score),
         evidence_token_budget=_int("CRITIC_EVIDENCE_TOKENS"),

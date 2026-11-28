@@ -131,3 +131,29 @@ def test_anthropic_refusal_raises_so_the_step_is_retried():
     llm, _, _, _ = _anthropic("claude-opus-5-5", stop_reason="refusal")
     with pytest.raises(RuntimeError, match="refused"):
         asyncio.run(llm.complete("s", "u", agent="critic"))
+
+
+class _FakeHttp:
+    def __init__(self):
+        self.bodies = []
+
+    async def post(self, url, json):
+        self.bodies.append(json)
+        return types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: {
+            "message": {"content": "{}", "thinking": "..."}, "prompt_eval_count": 3, "eval_count": 9})
+
+
+@pytest.mark.parametrize("think, sent, budget", [("", None, 600), ("false", False, 600), ("high", "high", 600 + 4096),
+                                                 ("true", True, 600 + 4096)])
+def test_ollama_thinking_gets_its_own_token_budget(think, sent, budget):
+    from critic_agent.llm import OllamaLLM
+
+    llm = OllamaLLM(Settings(llm_model="gpt-oss:20b", ollama_think=think), CostTracker())
+    llm._client = _FakeHttp()
+    asyncio.run(llm.complete("s", "u", agent="evaluator", max_tokens=600))
+    body = llm._client.bodies[0]
+    assert body.get("think") == sent and body["options"]["num_predict"] == budget and body["format"] == "json"
+    off = OllamaLLM(Settings(ollama_json_format=False), CostTracker())
+    off._client = _FakeHttp()
+    asyncio.run(off.complete("s", "u", agent="a"))
+    assert "format" not in off._client.bodies[0]
