@@ -1,58 +1,69 @@
 {
-  "_doc": "Reference scores for scripts/calibrate.py. reference_score = mean reviewer rating on OpenReview (1-10) where the paper has one; null otherwise. Fill these from the OpenReview pages, do not guess. Add weaker papers too (e.g. rejected ICLR submissions with their ratings): a calibration set of only strong papers cannot tell a good scorer from one that gives 8 to everything.",
+  "_doc": "Reference scores for scripts/calibrate.py. reference_score = mean reviewer rating on OpenReview (1-10) where the paper has one; null otherwise. Fill these from the OpenReview pages, do not guess. Add weaker papers too (e.g. rejected ICLR submissions with their ratings): a calibration set of only strong papers cannot tell a good scorer from one that gives 8 to everything. arxiv = the arXiv version of each paper (scripts/fetch_papers.py downloads it; the version matches the group's copy where that copy carries an arXiv stamp, otherwise the latest version).",
   "papers": [
     {
       "file": "01_ AgentBench_ICLR2024.pdf",
+      "arxiv": "2308.03688v3",
       "venue": "ICLR 2024",
       "reference_score": null
     },
     {
       "file": "02_ GAIA_ICLR2024.pdf",
+      "arxiv": "2311.12983v1",
       "venue": "ICLR 2024",
       "reference_score": null
     },
     {
       "file": "03_ WebArena_ICLR2024.pdf",
+      "arxiv": "2307.13854v4",
       "venue": "ICLR 2024",
       "reference_score": null
     },
     {
       "file": "04_tbench_2024.pdf",
+      "arxiv": "2406.12045v1",
       "venue": "2024",
       "reference_score": null
     },
     {
       "file": "05_AIAgentsThatMatter_2024.pdf",
+      "arxiv": "2407.01502v1",
       "venue": "2024",
       "reference_score": null
     },
     {
       "file": "06_JudgingLLMasaJudge_NeurIPS2023.pdf",
+      "arxiv": "2306.05685v4",
       "venue": "NeurIPS 2023",
       "reference_score": null
     },
     {
       "file": "DeepSeek-AI — DeepSeek-R1 (2025).pdf",
+      "arxiv": "2501.12948",
       "venue": "2025",
       "reference_score": null
     },
     {
       "file": "Lightman et al. — Process reward models (ICLR 2024).pdf",
+      "arxiv": "2305.20050v1",
       "venue": "ICLR 2024",
       "reference_score": null
     },
     {
       "file": "Ouyang et al. — RLHF (NeurIPS 2022).pdf",
+      "arxiv": "2203.02155",
       "venue": "NeurIPS 2022",
       "reference_score": null
     },
     {
       "file": "Pan et al. — SWE-Gym (2024).pdf",
+      "arxiv": "2412.21139v2",
       "venue": "2024",
       "reference_score": null
     },
     {
       "file": "Shao et al. — GRPO : DeepSeekMath (2024).pdf",
+      "arxiv": "2402.03300v3",
       "venue": "2024",
       "reference_score": null
     }
