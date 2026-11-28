@@ -23,6 +23,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 app = FastAPI(title="Critic-Agent Explorer")
 HEARTBEAT_S = 15  # SSE comment interval: tunnels and proxies may close a stream that stays silent too long
 _run_lock = asyncio.Lock()  # one live run at a time: a local model cannot serve two reviews at once
+# Live runs are not tied to the browser connection: a viewer who closes the tab (or a proxy that drops the stream)
+# must not cancel a run halfway through its MCP session, which leaves anyio cancelling it forever at 100% CPU.
+_runs: set[asyncio.Task] = set()
 
 
 @app.get("/api/health")
@@ -67,21 +70,21 @@ async def run(paper: str, seed: int = 1) -> StreamingResponse:
             except Exception as exc:  # surfaced to the browser instead of a silent hang
                 await queue.put({"type": "error", "error": f"{type(exc).__name__}: {exc}"[:300]})
 
+    task = asyncio.create_task(worker())  # finishes and saves to runs/live even if nobody is listening
+    _runs.add(task)
+    task.add_done_callback(_runs.discard)
+
     async def stream():
-        task = asyncio.create_task(worker())
         yield ":" + " " * 2048 + "\n\n"  # padding comment: some proxies hold back the first few KB of a response
-        try:
-            while True:
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_S)
-                except asyncio.TimeoutError:  # one LLM call can take minutes; keep proxies from closing the stream
-                    yield ": ping\n\n"
-                    continue
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-                if event["type"] in ("final", "error"):
-                    break
-        finally:
-            await task
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_S)
+            except asyncio.TimeoutError:  # one LLM call can take minutes; keep proxies from closing the stream
+                yield ": ping\n\n"
+                continue
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            if event["type"] in ("final", "error"):
+                break
 
     # no-transform: proxies such as a Cloudflare tunnel may otherwise compress, and therefore buffer, the event stream
     return StreamingResponse(stream(), media_type="text/event-stream", headers={
